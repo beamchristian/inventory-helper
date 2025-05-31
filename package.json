@@ -9,19 +9,25 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
+    "@tanstack/react-query": "^5.77.2",
+    "next": "15.3.2",
+    "postgres": "^3.4.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "next": "15.3.2"
+    "react-hook-form": "^7.56.4",
+    "zustand": "^5.0.5"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
     "eslint": "^9",
     "eslint-config-next": "15.3.2",
-    "@eslint/eslintrc": "^3"
+    "supabase": "^2.23.4",
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }
