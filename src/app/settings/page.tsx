@@ -20,7 +20,7 @@ const LoadingSpinner = () => (
 
 export default function SettingsPage() {
   const [userId, setUserId] = useState<string | null>(null);
-  const { data: items, isLoading, isError, error, refetch } = useItems();
+  const { data: items, isLoading, isError, error } = useItems();
   const addItemMutation = useAddItem();
   const updateItemMutation = useUpdateItem();
   const deleteItemMutation = useDeleteItem();
