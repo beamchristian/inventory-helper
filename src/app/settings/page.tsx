@@ -1,7 +1,7 @@
 // src/app/settings/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   useItems,
   useAddItem,
@@ -18,12 +18,25 @@ const LoadingSpinner = () => (
   </div>
 );
 
+// Define the type for sortable columns
+type SortColumn =
+  | "name"
+  | "upc_number"
+  | "unit_type"
+  | "average_weight_per_unit"
+  | "item_type"
+  | "brand";
+
 export default function SettingsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const { data: items, isLoading, isError, error } = useItems();
   const addItemMutation = useAddItem();
   const updateItemMutation = useUpdateItem();
   const deleteItemMutation = useDeleteItem();
+
+  // State for sorting
+  const [sortColumn, setSortColumn] = useState<SortColumn>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   // State for the "Add New Item" form
   const [newItemForm, setNewItemForm] = useState<
@@ -160,6 +173,54 @@ export default function SettingsPage() {
       }
     }
   };
+
+  // Sorting logic
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // If the same column is clicked, reverse the sort direction
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // If a new column is clicked, sort by that column in ascending order
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  // Memoize sorted items to prevent unnecessary re-renders
+  const sortedItems = useMemo(() => {
+    if (!items) return [];
+
+    const sortableItems = [...items]; // Create a shallow copy to avoid mutating the original array
+
+    sortableItems.sort((a, b) => {
+      const aValue = a[sortColumn];
+      const bValue = b[sortColumn];
+
+      // Handle null or undefined values gracefully
+      if (aValue === null || aValue === undefined)
+        return sortDirection === "asc" ? 1 : -1;
+      if (bValue === null || bValue === undefined)
+        return sortDirection === "asc" ? -1 : 1;
+
+      if (typeof aValue === "string" && typeof bValue === "string") {
+        return sortDirection === "asc"
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+      }
+
+      // Fallback for other types or if types are mixed
+      const valA = String(aValue);
+      const valB = String(bValue);
+      return sortDirection === "asc"
+        ? valA.localeCompare(valB)
+        : valB.localeCompare(valA);
+    });
+    return sortableItems;
+  }, [items, sortColumn, sortDirection]);
 
   if (!userId) {
     return <LoadingSpinner />; // Or a message like "Please log in"
@@ -308,27 +369,69 @@ export default function SettingsPage() {
         {isError && (
           <p className='text-red-500'>Error loading items: {error?.message}</p>
         )}
-        {!isLoading && !isError && items && items.length === 0 && (
+        {!isLoading && !isError && sortedItems && sortedItems.length === 0 && (
           <p className='text-gray-600'>
             No items added yet. Use the form above to add your first item!
           </p>
         )}
-        {!isLoading && !isError && items && items.length > 0 && (
+        {!isLoading && !isError && sortedItems && sortedItems.length > 0 && (
           <div className='overflow-x-auto'>
             <table className='min-w-full bg-white border border-gray-200'>
               <thead>
                 <tr className='bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider'>
-                  <th className='py-3 px-4 border-b'>Name</th>
-                  <th className='py-3 px-4 border-b'>UPC</th>
-                  <th className='py-3 px-4 border-b'>Unit Type</th>
-                  <th className='py-3 px-4 border-b'>Avg. Weight</th>
-                  <th className='py-3 px-4 border-b'>Item Type</th>
-                  <th className='py-3 px-4 border-b'>Brand</th>
+                  <th
+                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
+                    onClick={() => handleSort("name")}
+                  >
+                    Name
+                    {sortColumn === "name" &&
+                      (sortDirection === "asc" ? " ↑" : " ↓")}
+                  </th>
+                  <th
+                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
+                    onClick={() => handleSort("upc_number")}
+                  >
+                    UPC
+                    {sortColumn === "upc_number" &&
+                      (sortDirection === "asc" ? " ↑" : " ↓")}
+                  </th>
+                  <th
+                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
+                    onClick={() => handleSort("unit_type")}
+                  >
+                    Unit Type
+                    {sortColumn === "unit_type" &&
+                      (sortDirection === "asc" ? " ↑" : " ↓")}
+                  </th>
+                  <th
+                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
+                    onClick={() => handleSort("average_weight_per_unit")}
+                  >
+                    Avg. Weight
+                    {sortColumn === "average_weight_per_unit" &&
+                      (sortDirection === "asc" ? " ↑" : " ↓")}
+                  </th>
+                  <th
+                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
+                    onClick={() => handleSort("item_type")}
+                  >
+                    Item Type
+                    {sortColumn === "item_type" &&
+                      (sortDirection === "asc" ? " ↑" : " ↓")}
+                  </th>
+                  <th
+                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
+                    onClick={() => handleSort("brand")}
+                  >
+                    Brand
+                    {sortColumn === "brand" &&
+                      (sortDirection === "asc" ? " ↑" : " ↓")}
+                  </th>
                   <th className='py-3 px-4 border-b text-center'>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {sortedItems.map((item) => (
                   <React.Fragment key={item.id}>
                     {editingItem && editingItem.id === item.id ? (
                       // Edit Form Row
