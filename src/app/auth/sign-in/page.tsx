@@ -81,7 +81,7 @@ export default function SignInPage() {
               href='/auth/sign-up'
               className='inline-block align-baseline font-bold text-sm text-blue-500 hover:text-blue-800'
             >
-              Don't have an account? Sign Up
+              Don&apos;t have an account? Sign Up
             </a>
           </div>
         </form>

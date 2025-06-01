@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation"; // Import usePathname
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import "./globals.css";
+import Header from "@/components/Header";
 
 const queryClient = new QueryClient();
 
@@ -18,10 +19,9 @@ export default function RootLayout({
   const pathname = usePathname(); // Get current path
   const [isLoading, setIsLoading] = useState(true);
 
-  // Define paths that do NOT require authentication
-  const publicPaths = ["/auth/sign-in", "/auth/sign-up", "/auth/callback"]; // Add any other public pages
-
   useEffect(() => {
+    // Define paths that do NOT require authentication
+    const publicPaths = ["/auth/sign-in", "/auth/sign-up", "/auth/callback"]; // Add any other public pages
     const checkSession = async () => {
       const {
         data: { session },
@@ -69,7 +69,15 @@ export default function RootLayout({
     <html lang='en'>
       <body>
         <QueryClientProvider client={queryClient}>
-          {children}
+          {/* Header will be rendered here */}
+          <Header />
+          <div className='min-h-screen bg-gray-100 flex flex-col'>
+            <div className='flex-grow'>
+              {" "}
+              {/* Allows children to take up remaining space */}
+              {children}
+            </div>
+          </div>
         </QueryClientProvider>
       </body>
     </html>

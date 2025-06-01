@@ -15,7 +15,7 @@ export interface Inventory {
   user_id: string;
   name: string;
   status: "draft" | "completed" | "deleted";
-  settings: Record<string, any> | null; // JSONB type for settings
+  settings: Record<string, unknown> | null; // JSONB type for settings - Changed 'any' to 'unknown'
   created_at: string;
   updated_at: string;
 }
@@ -34,5 +34,5 @@ export interface InventoryItem {
 
 export interface UpdateInventoryArgs {
   id: string;
-  status: 'completed' | 'active'; // Or whatever your status types are
+  status: "completed" | "active"; // Or whatever your status types are
 }

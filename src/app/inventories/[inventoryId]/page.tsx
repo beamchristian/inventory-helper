@@ -6,17 +6,16 @@ import React, { useEffect, useState, useMemo } from "react";
 // Importing Next.js navigation hooks for routing within the application.
 import { useRouter, useParams } from "next/navigation";
 // Importing Supabase client for database interactions.
-import { supabase } from "../../../lib/supabase";
+import { supabase } from "@/lib/supabase";
 // Importing useQuery from TanStack Query for data fetching and caching.
 import { useQuery } from "@tanstack/react-query";
 // Importing custom types for data structures.
-import { Inventory, InventoryItem, Item } from "../../../types";
+import { Inventory } from "@/types";
 // Importing custom hooks for managing master item list and inventory-specific items.
-import { useItems } from "../../../hooks/useItems";
+import { useItems } from "@/hooks/useItems";
 import {
   useInventoryItems,
   useAddInventoryItem,
-  useUpdateInventoryItem,
   useDeleteInventoryItem,
 } from "../../../hooks/useInventoryItems";
 // Import the new useUpdateInventory hook
@@ -173,8 +172,8 @@ export default function InventoryDetailPage() {
     const sortableItems = [...currentInventoryItems];
 
     sortableItems.sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: string | number | null | undefined;
+      let bValue: string | number | null | undefined;
 
       switch (sortColumn) {
         case "name":
@@ -352,8 +351,8 @@ export default function InventoryDetailPage() {
           </p>
           {inventoryError?.message.includes("Row not found") && (
             <p className='text-gray-600'>
-              This inventory might not exist or you don't have permission to
-              view it.
+              This inventory might not exist or you don&apos;t have permission
+              to view it.
             </p>
           )}
           <button
