@@ -1,12 +1,15 @@
 // src/app/layout.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation"; // Import usePathname
+import { useEffect, useState, useMemo } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import "./globals.css";
 import Header from "@/components/Header";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
 
 const queryClient = new QueryClient();
 
@@ -16,18 +19,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const pathname = usePathname(); // Get current path
+  const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
 
+  const publicPaths = useMemo(
+    () => ["/auth/sign-in", "/auth/sign-up", "/auth/callback"],
+    []
+  );
+
   useEffect(() => {
-    // Define paths that do NOT require authentication
-    const publicPaths = ["/auth/sign-in", "/auth/sign-up", "/auth/callback"]; // Add any other public pages
     const checkSession = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      // If there's no session AND the current path is NOT a public path, redirect to sign-in
       if (!session && !publicPaths.includes(pathname)) {
         router.push("/auth/sign-in");
       }
@@ -41,8 +46,6 @@ export default function RootLayout({
         if (event === "SIGNED_OUT") {
           router.push("/auth/sign-in");
         } else if (session && publicPaths.includes(pathname)) {
-          // If a session is established while on a public path (e.g., after email confirmation),
-          // redirect to the main app page.
           router.push("/");
         }
       }
@@ -51,14 +54,14 @@ export default function RootLayout({
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [router, pathname]); // Add pathname to dependency array
+  }, [router, pathname, publicPaths]);
 
   if (isLoading) {
     return (
       <html lang='en'>
-        <body>
+        <body className={inter.className}>
           <div className='flex justify-center items-center h-screen'>
-            Loading...
+            <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary dark:border-primary-dark'></div>
           </div>
         </body>
       </html>
@@ -67,16 +70,11 @@ export default function RootLayout({
 
   return (
     <html lang='en'>
-      <body>
+      <body className={inter.className}>
         <QueryClientProvider client={queryClient}>
-          {/* Header will be rendered here */}
           <Header />
-          <div className='min-h-screen bg-gray-100 flex flex-col'>
-            <div className='flex-grow'>
-              {" "}
-              {/* Allows children to take up remaining space */}
-              {children}
-            </div>
+          <div className='min-h-screen bg-background-surface flex flex-col'>
+            <div className='flex-grow'>{children}</div>
           </div>
         </QueryClientProvider>
       </body>

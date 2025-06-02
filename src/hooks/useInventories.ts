@@ -28,7 +28,6 @@ const useAuthUserId = () => {
 // Fetch all inventories for the logged-in user
 export const useInventories = () => {
   const userId = useAuthUserId();
-  console.log("useInventories: current userId:", userId);
   return useQuery<Inventory[]>({
     queryKey: ["inventories", userId],
     queryFn: async () => {

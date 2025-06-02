@@ -1,12 +1,11 @@
 // src/app/inventories/[inventoryId]/items/[itemId]/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { InventoryItem, Item } from "@/types";
-// Corrected import: Import useInventoryItems directly from its file
 import {
   useInventoryItems,
   useUpdateInventoryItem,
@@ -58,7 +57,6 @@ export default function InventoryItemDetailPage() {
     error: inventoryItemError,
   } = useInventoryItemDetails(itemId);
 
-  // Corrected: Call useInventoryItems directly
   const {
     data: allInventoryItems,
     isLoading: areAllItemsLoading,
@@ -68,53 +66,81 @@ export default function InventoryItemDetailPage() {
 
   const updateInventoryItemMutation = useUpdateInventoryItem();
 
-  const [editingCount, setEditingCount] = useState<number | undefined>(
-    undefined
+  // State for the value entered into the input field
+  const [inputValue, setInputValue] = useState<string>("");
+
+  // Helper function to update the count
+  const performUpdate = useCallback(
+    async (newCount: number) => {
+      if (!inventoryItem?.id || !inventoryItem.inventory_id) return;
+
+      if (newCount < 0) {
+        alert("Count cannot go below zero.");
+        return;
+      }
+
+      if (
+        inventoryItem.items.unit_type === "quantity" &&
+        !Number.isInteger(newCount)
+      ) {
+        alert("Quantity items must have whole number counts.");
+        newCount = Math.floor(newCount); // Force it to be an integer
+      }
+
+      try {
+        await updateInventoryItemMutation.mutateAsync({
+          id: inventoryItem.id,
+          counted_units: newCount,
+          inventory_id: inventoryItem.inventory_id,
+        });
+        queryClient.invalidateQueries({ queryKey: ["inventoryItem", itemId] });
+        queryClient.invalidateQueries({
+          queryKey: ["inventoryItems", inventoryId],
+        });
+        setInputValue(""); // Clear input after successful update
+      } catch (err) {
+        alert(
+          `Error updating count: ${
+            err instanceof Error ? err.message : "Unknown error"
+          }`
+        );
+      }
+    },
+    [
+      inventoryItem,
+      updateInventoryItemMutation,
+      queryClient,
+      itemId,
+      inventoryId,
+    ]
   );
 
-  useEffect(() => {
-    if (inventoryItem) {
-      setEditingCount(inventoryItem.counted_units);
-    }
-  }, [inventoryItem]);
+  const handleOperation = (operation: "add" | "subtract" | "replace") => {
+    const value = parseFloat(inputValue);
 
-  const handleUpdateCount = async (newCount: number) => {
-    if (!inventoryItem?.id || !inventoryItem.inventory_id) return;
-
-    if (isNaN(newCount) || newCount < 0) {
-      alert("Count must be a non-negative number.");
+    if (isNaN(value)) {
+      alert("Please enter a valid number.");
       return;
     }
 
-    if (
-      inventoryItem.items.unit_type === "quantity" &&
-      !Number.isInteger(newCount)
-    ) {
-      alert("Quantity items must have whole number counts.");
-      setEditingCount(Math.floor(newCount)); // Keep the UI value integer
-      return;
+    let newCount: number;
+    const currentCount = inventoryItem?.counted_units ?? 0;
+
+    switch (operation) {
+      case "add":
+        newCount = currentCount + value;
+        break;
+      case "subtract":
+        newCount = currentCount - value;
+        break;
+      case "replace":
+        newCount = value;
+        break;
+      default:
+        return;
     }
 
-    try {
-      await updateInventoryItemMutation.mutateAsync({
-        id: inventoryItem.id,
-        counted_units: newCount,
-        inventory_id: inventoryItem.inventory_id,
-      });
-      // Invalidate the specific item and the list to ensure all data is fresh
-      queryClient.invalidateQueries({ queryKey: ["inventoryItem", itemId] });
-      queryClient.invalidateQueries({
-        queryKey: ["inventoryItems", inventoryId],
-      });
-
-      alert("Item count updated successfully!");
-    } catch (err) {
-      alert(
-        `Error updating count: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
-      );
-    }
+    performUpdate(newCount);
   };
 
   const currentIndex = allInventoryItems?.findIndex(
@@ -143,18 +169,19 @@ export default function InventoryItemDetailPage() {
 
   const isFirstItem = currentIndex === 0;
   const isLastItem = currentIndex === totalItems - 1;
+  const isUpdating = updateInventoryItemMutation.isPending;
 
   if (isInventoryItemLoading || areAllItemsLoading) {
     return (
-      <div className='flex justify-center items-center h-screen'>
-        <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500'></div>
+      <div className='flex justify-center items-center h-screen bg-background-base'>
+        <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
       </div>
     );
   }
 
   if (isInventoryItemError) {
     return (
-      <div className='text-red-500 text-center mt-8'>
+      <div className='text-error text-center mt-8 bg-background-base p-4 rounded-lg'>
         Error loading item: {inventoryItemError?.message}
       </div>
     );
@@ -162,7 +189,7 @@ export default function InventoryItemDetailPage() {
 
   if (areAllItemsError) {
     return (
-      <div className='text-red-500 text-center mt-8'>
+      <div className='text-error text-center mt-8 bg-background-base p-4 rounded-lg'>
         Error loading inventory items list: {allItemsError?.message}
       </div>
     );
@@ -170,125 +197,137 @@ export default function InventoryItemDetailPage() {
 
   if (!inventoryItem) {
     return (
-      <div className='text-center mt-8 text-gray-600'>
+      <div className='text-center mt-8 text-text-muted bg-background-base p-4 rounded-lg'>
         Inventory item not found.
       </div>
     );
   }
 
+  const currentCount = inventoryItem.counted_units ?? 0;
+  const calculatedTotalWeight =
+    inventoryItem.items.unit_type === "weight" &&
+    inventoryItem.items.average_weight_per_unit != null
+      ? (currentCount * inventoryItem.items.average_weight_per_unit).toFixed(2)
+      : null;
+
   return (
-    <div className='container mx-auto p-4 max-w-2xl'>
+    <div className='container mx-auto p-4 max-w-2xl bg-background-base mt-4 rounded-lg'>
       <header className='flex justify-between items-center mb-6'>
-        <h1 className='text-3xl font-bold text-gray-800'>
+        <h1 className='text-3xl font-bold text-foreground'>
           Viewing Item: {inventoryItem.items.name}
         </h1>
         <button
           onClick={() => router.push(`/inventories/${inventoryId}`)}
-          className='bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow-md'
+          className='bg-secondary hover:bg-secondary/80 text-text-inverse font-bold py-2 px-4 rounded shadow-md'
         >
           Back to Inventory
         </button>
       </header>
 
-      <main className='bg-white p-6 rounded-lg shadow-md'>
+      <main className='bg-background-surface p-6 rounded-lg shadow-md border border-border-base'>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-4 text-lg mb-6'>
-          <p>
+          <p className='text-text-base'>
             <span className='font-semibold'>Item Name:</span>{" "}
             {inventoryItem.items.name}
           </p>
-          <p>
+          <p className='text-text-base'>
             <span className='font-semibold'>Unit Type:</span>{" "}
             <span className='capitalize'>{inventoryItem.items.unit_type}</span>
           </p>
-          <p>
+          <p className='text-text-base'>
             <span className='font-semibold'>UPC Number:</span>{" "}
             {inventoryItem.items.upc_number || "N/A"}
           </p>
           {inventoryItem.items.unit_type === "weight" && (
-            <p>
+            <p className='text-text-base'>
               <span className='font-semibold'>Avg. Unit Weight:</span>{" "}
               {inventoryItem.items.average_weight_per_unit?.toFixed(2) || "N/A"}{" "}
               lbs
             </p>
           )}
-          <p>
+          <p className='text-text-base'>
             <span className='font-semibold'>Master Item ID:</span>{" "}
             {inventoryItem.item_id}
           </p>
-          <p>
+          <p className='text-text-base'>
             <span className='font-semibold'>Inventory Item ID:</span>{" "}
             {inventoryItem.id}
           </p>
         </div>
 
-        <div className='mt-6 border-t pt-6'>
-          <h2 className='text-2xl font-semibold mb-4'>Update Count</h2>
-          <div className='flex flex-col sm:flex-row items-center gap-4'>
-            <label htmlFor='countedUnits' className='font-medium text-lg'>
-              Counted Units:
+        <div className='mt-6 pt-6'>
+          <h2 className='text-2xl font-semibold mb-4 text-foreground text-center'>
+            Current Count
+          </h2>
+          <div className='text-4xl font-extrabold text-primary text-center mb-6'>
+            {currentCount}
+          </div>
+
+          <div className='flex flex-col gap-4 items-center'>
+            <label htmlFor='countInput' className='sr-only'>
+              Enter value to add, subtract, or replace
             </label>
             <input
-              id='countedUnits'
+              id='countInput'
               type='number'
               step={inventoryItem.items.unit_type === "quantity" ? "1" : "any"}
-              value={editingCount ?? ""} // This part is correct: undefined becomes ""
-              onChange={(e) => {
-                const inputValue = e.target.value;
-                if (inputValue === "") {
-                  setEditingCount(undefined); // <--- CHANGE THIS LINE: Allow the input to be truly empty
-                } else {
-                  // <--- CHANGE THIS LINE: Perform conversion only if not empty
-                  setEditingCount(Number(inputValue));
-                }
-              }}
-              className='flex-grow p-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder='Enter value'
+              className='p-3 border border-border-base rounded-lg shadow-sm text-center text-foreground bg-background w-full max-w-xs focus:outline-none focus:ring-2 focus:ring-primary'
             />
-            <button
-              onClick={() =>
-                editingCount !== undefined && handleUpdateCount(editingCount)
-              }
-              disabled={
-                updateInventoryItemMutation.isPending ||
-                editingCount === undefined
-              }
-              className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
-            >
-              {updateInventoryItemMutation.isPending
-                ? "Updating..."
-                : "Save Count"}
-            </button>
+
+            <div className='flex flex-wrap justify-center gap-3 w-full max-w-xs'>
+              <button
+                onClick={() => handleOperation("add")}
+                disabled={isUpdating || inputValue === ""}
+                className='flex-1 min-w-[80px] bg-success hover:bg-success/80 text-text-inverse font-bold py-3 px-4 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200'
+              >
+                Add
+              </button>
+              <button
+                onClick={() => handleOperation("subtract")}
+                disabled={isUpdating || inputValue === ""}
+                className='flex-1 min-w-[80px] bg-error hover:bg-error/80 text-text-inverse font-bold py-3 px-4 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200'
+              >
+                Subtract
+              </button>
+              <button
+                onClick={() => handleOperation("replace")}
+                disabled={isUpdating || inputValue === ""}
+                className='flex-1 min-w-[80px] bg-primary hover:bg-primary/80 text-text-inverse font-bold py-3 px-4 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200'
+              >
+                Replace
+              </button>
+            </div>
           </div>
-          {inventoryItem.items.unit_type === "weight" &&
-            inventoryItem.items.average_weight_per_unit != null &&
-            editingCount !== undefined && (
-              <p className='mt-2 text-gray-700'>
-                Calculated Total Weight:{" "}
-                {(
-                  editingCount * inventoryItem.items.average_weight_per_unit
-                ).toFixed(2)}{" "}
-                lbs
-              </p>
-            )}
+
+          {calculatedTotalWeight !== null && (
+            <p className='mt-6 text-text-muted text-center text-lg'>
+              Calculated Total Weight:{" "}
+              <span className='font-semibold'>{calculatedTotalWeight}</span> lbs
+            </p>
+          )}
         </div>
 
         {/* Navigation Buttons */}
-        <div className='mt-8 flex justify-between items-center border-t pt-6'>
+        <div className='mt-8 flex justify-between items-center pt-6'>
           <button
             onClick={handlePrevious}
-            disabled={isFirstItem || updateInventoryItemMutation.isPending}
-            className='bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
+            disabled={isFirstItem || isUpdating}
+            className='bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-2 md:px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
           >
             &larr; Previous Item
           </button>
-          <span className='text-lg font-medium text-gray-700'>
+          <span className='md:text-lg font-medium text-foreground'>
             {currentIndex !== undefined && totalItems > 0
               ? `${currentIndex + 1} / ${totalItems}`
               : ""}
           </span>
           <button
             onClick={handleNext}
-            disabled={isLastItem || updateInventoryItemMutation.isPending}
-            className='bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
+            disabled={isLastItem || isUpdating}
+            className='bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
           >
             Next Item &rarr;
           </button>

@@ -1,37 +1,21 @@
-// src/app/inventories/[inventoryId]/page.tsx
 "use client";
 
-// Importing React and hooks for component creation and state management.
 import React, { useEffect, useState, useMemo } from "react";
-// Importing Next.js navigation hooks for routing within the application.
 import { useRouter, useParams } from "next/navigation";
-// Importing Supabase client for database interactions.
 import { supabase } from "@/lib/supabase";
-// Importing useQuery from TanStack Query for data fetching and caching.
 import { useQuery } from "@tanstack/react-query";
-// Importing custom types for data structures.
 import { Inventory } from "@/types";
-// Importing custom hooks for managing master item list and inventory-specific items.
 import { useItems } from "@/hooks/useItems";
 import {
   useInventoryItems,
   useAddInventoryItem,
   useDeleteInventoryItem,
 } from "../../../hooks/useInventoryItems";
-// Import the new useUpdateInventory hook
 import { useUpdateInventory } from "../../../hooks/useInventories";
 
-/**
- * useInventoryDetails Hook
- * Fetches details for a specific inventory.
- * Requires inventoryId from URL parameters and authenticated userId for RLS.
- * @param {string | undefined} inventoryId - The ID of the inventory to fetch.
- * @returns {object} TanStack Query result object containing data, loading, and error states.
- */
 const useInventoryDetails = (inventoryId: string | undefined) => {
   const [userId, setUserId] = useState<string | null>(null);
 
-  // Fetches the current authenticated user's ID on component mount.
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -61,39 +45,26 @@ const useInventoryDetails = (inventoryId: string | undefined) => {
   });
 };
 
-/**
- * LoadingSpinner Component
- * Displays a simple spinning loader during data fetching.
- * @returns {JSX.Element} A div containing a CSS-animated spinner.
- */
 const LoadingSpinner = () => (
   <div className='flex justify-center items-center h-20'>
-    <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500'></div>
+    <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
   </div>
 );
 
-// Define the type for sortable columns for InventoryItem
 type InventoryItemSortColumn =
-  | "name" // refers to invItem.items.name
-  | "unit_type" // refers to invItem.items.unit_type
-  | "upc_number" // refers to invItem.items.upc_number
+  | "name"
+  | "unit_type"
+  | "upc_number"
   | "counted_units"
   | "calculated_weight"
-  | "brand" // New sortable column
-  | "item_type"; // New sortable column
+  | "brand"
+  | "item_type";
 
-/**
- * InventoryDetailPage Component
- * Renders the detailed view for a single inventory, including its items,
- * and provides functionalities to add, update, and delete items.
- * @returns {JSX.Element} The inventory detail page layout.
- */
 export default function InventoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const inventoryId = params.inventoryId as string;
 
-  // --- ALL HOOKS MUST BE CALLED AT THE TOP LEVEL, UNCONDITIONALLY ---
   const {
     data: inventory,
     isLoading: isInventoryLoading,
@@ -117,16 +88,16 @@ export default function InventoryDetailPage() {
   const deleteInventoryItemMutation = useDeleteInventoryItem();
   const updateInventoryMutation = useUpdateInventory();
 
-  // State for sorting
   const [sortColumn, setSortColumn] = useState<InventoryItemSortColumn>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
-  // State for the selected item to add
+  // --- Pagination State ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10); // New state for items per page
+
   const [selectedItemIdToAdd, setSelectedItemIdToAdd] = useState<string>("");
 
-  // Calculate availableItemsToAdd. Use useMemo to prevent unnecessary recalculations.
   const availableItemsToAdd = useMemo(() => {
-    // Ensure both `allUserItems` and `currentInventoryItems` are loaded before filtering
     if (!allUserItems || !currentInventoryItems) {
       return [];
     }
@@ -136,13 +107,10 @@ export default function InventoryDetailPage() {
     );
 
     return allUserItems.filter((userItem) => !currentItemIds.has(userItem.id));
-  }, [allUserItems, currentInventoryItems]); // Recalculate only when these change
+  }, [allUserItems, currentInventoryItems]);
 
   useEffect(() => {
     if (availableItemsToAdd.length > 0) {
-      // If there are available items and the currently selected one is no longer
-      // in the list (e.g., if it was just added, or if it was the problematic one),
-      // or if nothing is selected, then default to the first available item.
       if (
         !selectedItemIdToAdd ||
         !availableItemsToAdd.some((item) => item.id === selectedItemIdToAdd)
@@ -150,13 +118,13 @@ export default function InventoryDetailPage() {
         setSelectedItemIdToAdd(availableItemsToAdd[0].id);
       }
     } else {
-      // If no items are available, clear the selection.
       setSelectedItemIdToAdd("");
     }
-  }, [availableItemsToAdd, selectedItemIdToAdd]); // Keep selectedItemIdToAdd here to react to its changes
+  }, [availableItemsToAdd, selectedItemIdToAdd]);
 
-  // Sorting logic
   const handleSort = (column: InventoryItemSortColumn) => {
+    // Reset to first page when sorting changes
+    setCurrentPage(1);
     if (sortColumn === column) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
@@ -165,7 +133,6 @@ export default function InventoryDetailPage() {
     }
   };
 
-  // Memoize sorted inventory items
   const sortedInventoryItems = useMemo(() => {
     if (!currentInventoryItems) return [];
 
@@ -193,23 +160,25 @@ export default function InventoryDetailPage() {
           bValue = b.counted_units;
           break;
         case "calculated_weight":
-          aValue = a.calculated_weight;
-          bValue = b.calculated_weight;
+          // Need to calculate on the fly for sorting if not a direct DB column
+          aValue =
+            (a.counted_units || 0) * (a.items.average_weight_per_unit || 0);
+          bValue =
+            (b.counted_units || 0) * (b.items.average_weight_per_unit || 0);
           break;
-        case "brand": // Handle sorting for brand
+        case "brand":
           aValue = a.items.brand;
           bValue = b.items.brand;
           break;
-        case "item_type": // Handle sorting for item_type
+        case "item_type":
           aValue = a.items.item_type;
           bValue = b.items.item_type;
           break;
         default:
-          aValue = a.items.name; // Default sort by name
+          aValue = a.items.name;
           bValue = b.items.name;
       }
 
-      // Handle null or undefined values gracefully
       if (aValue === null || aValue === undefined)
         return sortDirection === "asc" ? 1 : -1;
       if (bValue === null || bValue === undefined)
@@ -225,7 +194,6 @@ export default function InventoryDetailPage() {
         return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
       }
 
-      // Fallback for other types or if types are mixed
       const valA = String(aValue);
       const valB = String(bValue);
       return sortDirection === "asc"
@@ -235,7 +203,35 @@ export default function InventoryDetailPage() {
     return sortableItems;
   }, [currentInventoryItems, sortColumn, sortDirection]);
 
-  // --- Event Handlers (can be defined here or above, but should not contain hooks) ---
+  // --- Pagination Logic ---
+  const totalItems = sortedInventoryItems.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return sortedInventoryItems.slice(startIndex, endIndex);
+  }, [sortedInventoryItems, currentPage, itemsPerPage]);
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handlePreviousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  // Handler for changing items per page
+  const handleItemsPerPageChange = (
+    event: React.ChangeEvent<HTMLSelectElement>
+  ) => {
+    setItemsPerPage(Number(event.target.value));
+    setCurrentPage(1); // Reset to first page when items per page changes
+  };
+
   const handleAddItemToInventory = async () => {
     if (!selectedItemIdToAdd) {
       alert("Please select an item to add.");
@@ -246,7 +242,6 @@ export default function InventoryDetailPage() {
       return;
     }
 
-    // Frontend check to prevent immediate re-add (though backend is primary check)
     const isAlreadyAdded = (currentInventoryItems || []).some(
       (invItem) => invItem.item_id === selectedItemIdToAdd
     );
@@ -254,7 +249,7 @@ export default function InventoryDetailPage() {
       alert(
         "This item has already been added to this inventory. Please select another item."
       );
-      return; // No need to setSelectedItemIdToAdd here, useEffect handles it
+      return;
     }
 
     try {
@@ -264,12 +259,14 @@ export default function InventoryDetailPage() {
         counted_units: 0,
       });
       alert("Item added to inventory!");
-      // The useEffect for selectedItemIdToAdd will handle resetting the dropdown.
+      // Re-evaluate total pages and potentially jump to the new last page if needed
+      // For simplicity, we'll just invalidate and let react-query refetch.
+      // If the new item goes to a new page, the user will have to navigate there manually.
+      // A more complex solution might calculate the new page and set currentPage.
     } catch (err) {
       let errorMessage = "Unknown error adding item.";
       if (err instanceof Error) {
         errorMessage = err.message;
-        // Check for Supabase unique constraint violation error code
         const supabaseError = err as Error & { code?: string };
         if (supabaseError.code === "23505") {
           errorMessage =
@@ -296,6 +293,11 @@ export default function InventoryDetailPage() {
           inventoryId: inventoryId,
         });
         alert(`"${itemName}" removed from inventory.`);
+        // If the last item on a page is deleted, and it's not the first page,
+        // navigate back one page.
+        if (paginatedItems.length === 1 && currentPage > 1) {
+          setCurrentPage(currentPage - 1);
+        }
       } catch (err) {
         alert(
           `Error removing item: ${
@@ -337,27 +339,40 @@ export default function InventoryDetailPage() {
     }
   };
 
-  // --- Conditional Rendering for Loading and Error States (AFTER ALL HOOKS) ---
-  if (isInventoryLoading || isAllItemsLoading || isCurrentItemsLoading) {
-    return <LoadingSpinner />;
+  const isAnyLoading =
+    isInventoryLoading || isAllItemsLoading || isCurrentItemsLoading;
+  const isAnyError = isInventoryError || isAllItemsError || isCurrentItemsError;
+
+  if (isAnyLoading) {
+    return (
+      <div className='min-h-screen flex items-center justify-center bg-background-base'>
+        <LoadingSpinner />
+      </div>
+    );
   }
 
-  if (isInventoryError) {
+  if (isAnyError) {
+    const errorMessage =
+      inventoryError?.message ||
+      allItemsError?.message ||
+      currentItemsError?.message;
+    const isNotFound = errorMessage?.includes("Row not found");
+
     return (
-      <div className='min-h-screen flex items-center justify-center bg-gray-100'>
-        <div className='text-center p-6 bg-white rounded-lg shadow-md'>
-          <p className='text-red-500 text-lg mb-4'>
-            Error loading inventory: {inventoryError?.message}
+      <div className='min-h-screen flex items-center justify-center bg-background-base'>
+        <div className='text-center p-6 bg-background-surface rounded-lg shadow-md'>
+          <p className='text-error text-lg mb-4'>
+            Error loading data: {errorMessage}
           </p>
-          {inventoryError?.message.includes("Row not found") && (
-            <p className='text-gray-600'>
+          {isNotFound && (
+            <p className='text-text-muted'>
               This inventory might not exist or you don&apos;t have permission
               to view it.
             </p>
           )}
           <button
             onClick={() => router.push("/")}
-            className='mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded'
+            className='mt-4 bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded'
           >
             Go back to Inventories
           </button>
@@ -368,12 +383,12 @@ export default function InventoryDetailPage() {
 
   if (!inventory) {
     return (
-      <div className='min-h-screen flex items-center justify-center bg-gray-100'>
-        <div className='text-center p-6 bg-white rounded-lg shadow-md'>
-          <p className='text-gray-600 text-lg mb-4'>Inventory not found.</p>
+      <div className='min-h-screen flex items-center justify-center bg-background-base'>
+        <div className='text-center p-6 bg-background-surface rounded-lg shadow-md'>
+          <p className='text-text-muted text-lg mb-4'>Inventory not found.</p>
           <button
             onClick={() => router.push("/")}
-            className='mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded'
+            className='mt-4 bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded'
           >
             Go back to Inventories
           </button>
@@ -382,63 +397,46 @@ export default function InventoryDetailPage() {
     );
   }
 
-  if (isAllItemsError || isCurrentItemsError) {
-    return (
-      <div className='min-h-screen flex items-center justify-center bg-gray-100'>
-        <div className='text-center p-6 bg-white rounded-lg shadow-md'>
-          <p className='text-red-500 text-lg mb-4'>
-            Error loading items:{" "}
-            {allItemsError?.message || currentItemsError?.message}
-          </p>
-          <button
-            onClick={() => router.push("/")}
-            className='mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded'
-          >
-            Go back to Inventories
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // --- Main Component Render ---
   return (
-    <div className='container mx-auto p-4 max-w-5xl'>
+    <div className='container mx-auto p-4 max-w-5xl min-h-screen bg-background-base'>
       <header className='flex flex-col px-3 sm:flex-row justify-between items-center mb-8 gap-4'>
-        <h1 className='text-3xl font-bold text-gray-800 text-center sm:text-left'>
+        <h1 className='text-3xl font-bold text-text-base text-center sm:text-left'>
           Inventory: {inventory.name}
         </h1>
         <button
           onClick={() => router.push("/")}
-          className='bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded shadow-md w-full sm:w-auto'
+          className='bg-secondary hover:bg-secondary/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md w-full sm:w-auto'
         >
           Back to All Inventories
         </button>
       </header>
 
-      <main className='bg-white p-4 sm:p-6 rounded-lg shadow-md'>
-        <p className='text-lg text-gray-700 mb-2'>
+      <main className='bg-background-surface p-4 sm:p-6 rounded-lg shadow-md'>
+        <p className='text-lg text-text-base mb-2'>
           Status:{" "}
           <span className='capitalize font-medium'>{inventory.status}</span>
         </p>
-        <p className='text-sm text-gray-600'>
+        <p className='text-sm text-text-muted'>
           Created: {new Date(inventory.created_at).toLocaleDateString()} at{" "}
           {new Date(inventory.created_at).toLocaleTimeString()}
         </p>
 
-        <h2 className='text-2xl font-semibold mt-8 mb-4'>
+        <h2 className='text-2xl font-semibold mt-8 mb-4 text-text-base'>
           Manage Items in This Inventory
         </h2>
 
-        <div className='border p-4 rounded bg-blue-50 mb-6 flex flex-wrap items-center gap-4'>
-          <label htmlFor='selectItem' className='text-lg font-medium'>
+        <div className='border border-border-base p-4 rounded bg-background-base mb-6 flex flex-wrap items-center gap-4'>
+          <label
+            htmlFor='selectItem'
+            className='text-lg font-medium text-text-base'
+          >
             Add an existing item:
           </label>
           <select
             id='selectItem'
             value={selectedItemIdToAdd}
             onChange={(e) => setSelectedItemIdToAdd(e.target.value)}
-            className='flex-grow min-w-[150px] p-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500'
+            className='flex-grow min-w-[150px] p-2 border border-border-base rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background-surface text-text-base'
             disabled={
               addInventoryItemMutation.isPending ||
               availableItemsToAdd.length === 0
@@ -458,10 +456,10 @@ export default function InventoryDetailPage() {
             onClick={handleAddItemToInventory}
             disabled={
               addInventoryItemMutation.isPending ||
-              availableItemsToAdd.length === 0 || // Disable if no items to add
-              !selectedItemIdToAdd // Disable if no item is currently selected in dropdown
+              availableItemsToAdd.length === 0 ||
+              !selectedItemIdToAdd
             }
-            className='bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
+            className='bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
           >
             {addInventoryItemMutation.isPending ? "Adding..." : "Add Item"}
           </button>
@@ -469,125 +467,178 @@ export default function InventoryDetailPage() {
 
         <div className='overflow-x-auto'>
           {sortedInventoryItems && sortedInventoryItems.length === 0 ? (
-            <p className='text-gray-600 text-center py-8'>
+            <p className='text-text-muted text-center py-8'>
               This inventory has no items yet. Add some from the dropdown above!
             </p>
           ) : (
-            <table className='min-w-full bg-white border border-gray-200'>
-              <thead>
-                <tr className='bg-gray-100 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider'>
-                  <th
-                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
-                    onClick={() => handleSort("name")}
-                  >
-                    Item Name
-                    {sortColumn === "name" &&
-                      (sortDirection === "asc" ? " ↑" : " ↓")}
-                  </th>
-                  <th
-                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
-                    onClick={() => handleSort("brand")}
-                  >
-                    Brand
-                    {sortColumn === "brand" &&
-                      (sortDirection === "asc" ? " ↑" : " ↓")}
-                  </th>
-                  <th
-                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
-                    onClick={() => handleSort("item_type")}
-                  >
-                    Item Type
-                    {sortColumn === "item_type" &&
-                      (sortDirection === "asc" ? " ↑" : " ↓")}
-                  </th>
-                  <th
-                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
-                    onClick={() => handleSort("unit_type")}
-                  >
-                    Unit Type
-                    {sortColumn === "unit_type" &&
-                      (sortDirection === "asc" ? " ↑" : " ↓")}
-                  </th>
-                  <th
-                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
-                    onClick={() => handleSort("upc_number")}
-                  >
-                    UPC Number
-                    {sortColumn === "upc_number" &&
-                      (sortDirection === "asc" ? " ↑" : " ↓")}
-                  </th>
-                  <th
-                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
-                    onClick={() => handleSort("counted_units")}
-                  >
-                    Count (Units)
-                    {sortColumn === "counted_units" &&
-                      (sortDirection === "asc" ? " ↑" : " ↓")}
-                  </th>
-                  <th
-                    className='py-3 px-4 border-b cursor-pointer hover:bg-gray-200'
-                    onClick={() => handleSort("calculated_weight")}
-                  >
-                    Total Weight (lbs)
-                    {sortColumn === "calculated_weight" &&
-                      (sortDirection === "asc" ? " ↑" : " ↓")}
-                  </th>
-                  <th className='py-3 px-4 border-b text-center'>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedInventoryItems?.map((invItem) => (
-                  <tr key={invItem.id} className='hover:bg-gray-50'>
-                    <td className='py-2 px-4 border-b'>{invItem.items.name}</td>
-                    <td className='py-2 px-4 border-b'>
-                      {invItem.items.brand || "N/A"}{" "}
-                    </td>
-                    <td className='py-2 px-4 border-b capitalize'>
-                      {invItem.items.item_type || "N/A"}{" "}
-                    </td>
-                    <td className='py-2 px-4 border-b capitalize'>
-                      {invItem.items.unit_type}
-                    </td>
-                    <td className='py-2 px-4 border-b'>
-                      {invItem.items.upc_number || "N/A"}{" "}
-                    </td>
-                    <td className='py-2 px-4 border-b'>
-                      {invItem.counted_units} units
-                    </td>
-                    <td className='py-2 px-4 border-b'>
-                      {invItem.items.unit_type === "weight"
-                        ? `${
-                            invItem.calculated_weight?.toFixed(2) || "0.00"
-                          } lbs`
-                        : "-"}
-                    </td>
-                    <td className='py-2 px-4 border-b text-center space-x-2 space-y-2'>
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/inventories/${inventoryId}/items/${invItem.id}`
-                          )
-                        }
-                        className='bg-blue-500 hover:bg-blue-600 text-white text-sm py-1 px-2 rounded'
-                      >
-                        View / Edit
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleDeleteInventoryItem(
-                            invItem.id,
-                            invItem.items.name
-                          )
-                        }
-                        className='bg-red-500 hover:bg-red-600 text-white text-sm py-1 px-2 rounded'
-                      >
-                        Remove
-                      </button>
-                    </td>
+            <>
+              {/* Items per page dropdown */}
+              <div className='flex items-center justify-end mb-4'>
+                <label htmlFor='itemsPerPage' className='text-text-muted mr-2'>
+                  Items per page:
+                </label>
+                <select
+                  id='itemsPerPage'
+                  value={itemsPerPage}
+                  onChange={handleItemsPerPageChange}
+                  className='p-2 border border-border-base rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background-surface text-text-base'
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+
+              <table className='min-w-full bg-background-surface border border-border-base'>
+                <thead>
+                  <tr className='bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider'>
+                    <th
+                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
+                      onClick={() => handleSort("name")}
+                    >
+                      Item Name
+                      {sortColumn === "name" &&
+                        (sortDirection === "asc" ? " ↑" : " ↓")}
+                    </th>
+                    <th
+                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
+                      onClick={() => handleSort("brand")}
+                    >
+                      Brand
+                      {sortColumn === "brand" &&
+                        (sortDirection === "asc" ? " ↑" : " ↓")}
+                    </th>
+                    <th
+                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
+                      onClick={() => handleSort("item_type")}
+                    >
+                      Item Type
+                      {sortColumn === "item_type" &&
+                        (sortDirection === "asc" ? " ↑" : " ↓")}
+                    </th>
+                    <th
+                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
+                      onClick={() => handleSort("unit_type")}
+                    >
+                      Unit Type
+                      {sortColumn === "unit_type" &&
+                        (sortDirection === "asc" ? " ↑" : " ↓")}
+                    </th>
+                    <th
+                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
+                      onClick={() => handleSort("upc_number")}
+                    >
+                      UPC Number
+                      {sortColumn === "upc_number" &&
+                        (sortDirection === "asc" ? " ↑" : " ↓")}
+                    </th>
+                    <th
+                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
+                      onClick={() => handleSort("counted_units")}
+                    >
+                      Count (Units)
+                      {sortColumn === "counted_units" &&
+                        (sortDirection === "asc" ? " ↑" : " ↓")}
+                    </th>
+                    <th
+                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
+                      onClick={() => handleSort("calculated_weight")}
+                    >
+                      Total Weight (lbs)
+                      {sortColumn === "calculated_weight" &&
+                        (sortDirection === "asc" ? " ↑" : " ↓")}
+                    </th>
+                    <th className='py-3 px-4 border-b border-border-base text-center'>
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paginatedItems.map((invItem) => (
+                    <tr
+                      key={invItem.id}
+                      className='hover:bg-background-base/50'
+                    >
+                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
+                        {invItem.items.name}
+                      </td>
+                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
+                        {invItem.items.brand || "N/A"}{" "}
+                      </td>
+                      <td className='py-2 px-4 border-b border-border-base capitalize text-text-base'>
+                        {invItem.items.item_type || "N/A"}{" "}
+                      </td>
+                      <td className='py-2 px-4 border-b border-border-base capitalize text-text-base'>
+                        {invItem.items.unit_type}
+                      </td>
+                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
+                        {invItem.items.upc_number || "N/A"}{" "}
+                      </td>
+                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
+                        {invItem.counted_units} units
+                      </td>
+                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
+                        {invItem.items.unit_type === "weight"
+                          ? `${
+                              (
+                                (invItem.counted_units || 0) *
+                                (invItem.items.average_weight_per_unit || 0)
+                              ).toFixed(2) || "0.00"
+                            } lbs`
+                          : "-"}
+                      </td>
+                      <td className='py-2 px-4 border-b border-border-base text-center space-x-2 space-y-2'>
+                        <button
+                          onClick={() =>
+                            router.push(
+                              `/inventories/${inventoryId}/items/${invItem.id}`
+                            )
+                          }
+                          className='bg-primary hover:bg-primary/90 text-text-inverse text-sm py-1 px-2 rounded'
+                        >
+                          View / Edit
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleDeleteInventoryItem(
+                              invItem.id,
+                              invItem.items.name
+                            )
+                          }
+                          className='bg-error hover:bg-error/90 text-text-inverse text-sm py-1 px-2 rounded'
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* --- Streamlined Pagination Controls --- */}
+              {totalPages > 1 && (
+                <div className='mt-6 flex justify-between items-center px-4'>
+                  <button
+                    onClick={handlePreviousPage}
+                    disabled={currentPage === 1}
+                    className='bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
+                  >
+                    &larr; Previous
+                  </button>
+                  <span className='md:text-lg font-medium text-foreground'>
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage === totalPages}
+                    className='bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
+                  >
+                    Next &rarr;
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -596,7 +647,7 @@ export default function InventoryDetailPage() {
             <button
               onClick={handleCompleteInventory}
               disabled={updateInventoryMutation.isPending}
-              className='bg-green-700 hover:bg-green-800 text-white font-bold py-2 px-6 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
+              className='bg-success hover:bg-success/90 text-text-inverse font-bold py-2 px-6 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
             >
               {updateInventoryMutation.isPending
                 ? "Completing..."
@@ -605,7 +656,7 @@ export default function InventoryDetailPage() {
           </div>
         )}
         {inventory.status === "completed" && (
-          <div className='mt-8 text-right text-lg text-green-700 font-semibold'>
+          <div className='mt-8 text-right text-lg text-success font-semibold'>
             This inventory is completed.
           </div>
         )}
