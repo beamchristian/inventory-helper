@@ -1,21 +1,23 @@
-// src/app/inventories/[inventoryId]/items/[itemId]/page.tsx
 "use client";
 
-import React, { useState, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
+// Added useMemo to the React import
+import React, { useState, useCallback, useMemo } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { InventoryItem, Item } from "@/types";
 import {
   useInventoryItems,
   useUpdateInventoryItem,
-} from "@/hooks/useInventoryItems";
+} from "@/hooks/useInventoryItems"; // Adjusted path for clarity
+
+// Import the reusable sort function we created
+import { sortForCountMode, sortForItemTypeOnly } from "@/lib/utils";
 
 /**
  * useInventoryItemDetails Hook
  * Fetches details for a specific inventory item, including its associated master item data.
- * @param {string | undefined} itemId - The ID of the inventory item to fetch.
- * @returns {object} TanStack Query result object.
+ * (This hook remains unchanged)
  */
 const useInventoryItemDetails = (itemId: string | undefined) => {
   return useQuery<InventoryItem & { items: Item }>({
@@ -45,8 +47,12 @@ const useInventoryItemDetails = (itemId: string | undefined) => {
 export default function InventoryItemDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams(); // Get access to search params
+
   const inventoryId = params.inventoryId as string;
-  const itemId = params.itemId as string; // This is the inventory_item ID, not the master item ID
+  const itemId = params.itemId as string;
+
+  const sortMode = searchParams.get("sortMode") || "default";
 
   const queryClient = useQueryClient();
 
@@ -57,12 +63,31 @@ export default function InventoryItemDetailPage() {
     error: inventoryItemError,
   } = useInventoryItemDetails(itemId);
 
+  // --- MODIFICATION START ---
+  // 2. Fetch the RAW, unsorted list of items
   const {
-    data: allInventoryItems,
+    data: rawInventoryItems, // Renamed to indicate it's unsorted
     isLoading: areAllItemsLoading,
     isError: areAllItemsError,
     error: allItemsError,
   } = useInventoryItems(inventoryId);
+
+  // 3. Conditionally sort the list based on the sortMode from the URL
+  const allInventoryItems = useMemo(() => {
+    if (!rawInventoryItems) return [];
+
+    switch (sortMode) {
+      case "itemType":
+        console.log("Sorting by: Item Type Only");
+        return sortForItemTypeOnly(rawInventoryItems);
+      case "default":
+      default:
+        console.log("Sorting by: Default (Type -> Brand -> Name)");
+        return sortForCountMode(rawInventoryItems);
+    }
+  }, [rawInventoryItems, sortMode]);
+
+  // --- MODIFICATION END ---
 
   const updateInventoryItemMutation = useUpdateInventoryItem();
 
@@ -143,6 +168,7 @@ export default function InventoryItemDetailPage() {
     performUpdate(newCount);
   };
 
+  // This logic now works on the newly sorted `allInventoryItems` array
   const currentIndex = allInventoryItems?.findIndex(
     (item) => item.id === itemId
   );

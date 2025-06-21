@@ -105,16 +105,10 @@ export default function HomePage() {
   return (
     // Use background-base for the main page background
     <div className='min-h-screen bg-background-base p-4'>
-      <header className='flex justify-between items-center mb-8 max-w-4xl mx-auto'>
+      <header className='flex justify-center items-center mb-8 max-w-4xl mx-auto'>
         {/* Use text-base for heading text */}
         <h1 className='text-4xl font-bold text-text-base'>Your Inventories</h1>
         {/* Use error color for sign-out button */}
-        <button
-          onClick={handleSignOut}
-          className='bg-error hover:bg-error/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md transition-colors'
-        >
-          Sign Out
-        </button>
       </header>
 
       <main className='max-w-4xl mx-auto'>

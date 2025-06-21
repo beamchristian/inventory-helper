@@ -12,6 +12,7 @@ import {
   useDeleteInventoryItem,
 } from "../../../hooks/useInventoryItems";
 import { useUpdateInventory } from "../../../hooks/useInventories";
+import { sortForCountMode, sortForItemTypeOnly } from "@/lib/utils";
 
 const useInventoryDetails = (inventoryId: string | undefined) => {
   const [userId, setUserId] = useState<string | null>(null);
@@ -97,6 +98,34 @@ export default function InventoryDetailPage() {
 
   const [selectedItemIdToAdd, setSelectedItemIdToAdd] = useState<string>("");
 
+  // 👇 Updated handler for the DEFAULT count mode
+  const handleStartDefaultCountMode = () => {
+    if (!currentInventoryItems || currentInventoryItems.length === 0) {
+      alert("There are no items in this inventory to count.");
+      return;
+    }
+    const sortedForCount = sortForCountMode(currentInventoryItems);
+    const firstItemId = sortedForCount[0].id;
+    // Navigate with the 'default' sortMode parameter
+    router.push(
+      `/inventories/${inventoryId}/items/${firstItemId}?sortMode=default`
+    );
+  };
+
+  // 👇 NEW handler for the ITEM TYPE count mode
+  const handleStartItemTypeCountMode = () => {
+    if (!currentInventoryItems || currentInventoryItems.length === 0) {
+      alert("There are no items in this inventory to count.");
+      return;
+    }
+    const sortedForCount = sortForItemTypeOnly(currentInventoryItems);
+    const firstItemId = sortedForCount[0].id;
+    // Navigate with the 'itemType' sortMode parameter
+    router.push(
+      `/inventories/${inventoryId}/items/${firstItemId}?sortMode=itemType`
+    );
+  };
+
   const availableItemsToAdd = useMemo(() => {
     if (!allUserItems || !currentInventoryItems) {
       return [];
@@ -131,6 +160,22 @@ export default function InventoryDetailPage() {
       setSortColumn(column);
       setSortDirection("asc");
     }
+  };
+
+  const handleStartCountMode = () => {
+    if (!currentInventoryItems || currentInventoryItems.length === 0) {
+      alert("There are no items in this inventory to count.");
+      return;
+    }
+
+    // Use utility function to sort the items
+    const sortedForCount = sortForCountMode(currentInventoryItems);
+
+    // Get the ID of the very first item
+    const firstItemId = sortedForCount[0].id;
+
+    // Navigate to the counting page
+    router.push(`/inventories/${inventoryId}/items/${firstItemId}`);
   };
 
   const sortedInventoryItems = useMemo(() => {
@@ -399,16 +444,28 @@ export default function InventoryDetailPage() {
 
   return (
     <div className='container mx-auto p-4 max-w-5xl min-h-screen bg-background-base'>
-      <header className='flex flex-col px-3 sm:flex-row justify-between items-center mb-8 gap-4'>
+      <header className='flex flex-col sm:flex-row justify-between items-center mb-8 gap-4'>
         <h1 className='text-3xl font-bold text-text-base text-center sm:text-left'>
           Inventory: {inventory.name}
         </h1>
-        <button
-          onClick={() => router.push("/")}
-          className='bg-secondary hover:bg-secondary/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md w-full sm:w-auto'
-        >
-          Back to All Inventories
-        </button>
+        <div className='flex flex-col sm:flex-row gap-2'>
+          {/* 👇 NEW "Count by Type" button */}
+          <button
+            onClick={handleStartItemTypeCountMode}
+            disabled={
+              !currentInventoryItems || currentInventoryItems.length === 0
+            }
+            className='bg-accent hover:bg-accent/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed'
+          >
+            Count by Type
+          </button>
+          <button
+            onClick={() => router.push("/")}
+            className='bg-secondary hover:bg-secondary/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md w-full sm:w-auto'
+          >
+            Back to All Inventories
+          </button>
+        </div>
       </header>
 
       <main className='bg-background-surface p-4 sm:p-6 rounded-lg shadow-md'>
