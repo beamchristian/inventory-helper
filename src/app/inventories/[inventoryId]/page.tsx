@@ -12,7 +12,7 @@ import {
   useDeleteInventoryItem,
 } from "../../../hooks/useInventoryItems";
 import { useUpdateInventory } from "../../../hooks/useInventories";
-import { sortForCountMode, sortForItemTypeOnly } from "@/lib/utils";
+import { sortForItemTypeOnly } from "@/lib/utils";
 
 const useInventoryDetails = (inventoryId: string | undefined) => {
   const [userId, setUserId] = useState<string | null>(null);
@@ -98,20 +98,6 @@ export default function InventoryDetailPage() {
 
   const [selectedItemIdToAdd, setSelectedItemIdToAdd] = useState<string>("");
 
-  // 👇 Updated handler for the DEFAULT count mode
-  const handleStartDefaultCountMode = () => {
-    if (!currentInventoryItems || currentInventoryItems.length === 0) {
-      alert("There are no items in this inventory to count.");
-      return;
-    }
-    const sortedForCount = sortForCountMode(currentInventoryItems);
-    const firstItemId = sortedForCount[0].id;
-    // Navigate with the 'default' sortMode parameter
-    router.push(
-      `/inventories/${inventoryId}/items/${firstItemId}?sortMode=default`
-    );
-  };
-
   // 👇 NEW handler for the ITEM TYPE count mode
   const handleStartItemTypeCountMode = () => {
     if (!currentInventoryItems || currentInventoryItems.length === 0) {
@@ -160,22 +146,6 @@ export default function InventoryDetailPage() {
       setSortColumn(column);
       setSortDirection("asc");
     }
-  };
-
-  const handleStartCountMode = () => {
-    if (!currentInventoryItems || currentInventoryItems.length === 0) {
-      alert("There are no items in this inventory to count.");
-      return;
-    }
-
-    // Use utility function to sort the items
-    const sortedForCount = sortForCountMode(currentInventoryItems);
-
-    // Get the ID of the very first item
-    const firstItemId = sortedForCount[0].id;
-
-    // Navigate to the counting page
-    router.push(`/inventories/${inventoryId}/items/${firstItemId}`);
   };
 
   const sortedInventoryItems = useMemo(() => {

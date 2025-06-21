@@ -50,7 +50,7 @@ export const sortForItemTypeOnly = (
   const sortableItems = [...items];
   sortableItems.sort((a, b) => {
     // 1. Primary Sort: by Item Type
-    let comparison = compare(a.items.item_type, b.items.item_type);
+    const comparison = compare(a.items.item_type, b.items.item_type);
     if (comparison !== 0) return comparison;
 
     // 2. Secondary (tie-breaker) Sort: by Name

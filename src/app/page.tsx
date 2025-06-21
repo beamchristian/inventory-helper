@@ -49,11 +49,6 @@ export default function HomePage() {
 
   const [newInventoryName, setNewInventoryName] = useState("");
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.push("/auth/sign-in");
-  };
-
   const handleCreateInventory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newInventoryName.trim()) {

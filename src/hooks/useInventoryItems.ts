@@ -167,7 +167,6 @@ export const useDeleteInventoryItem = () => {
   return useMutation({
     mutationFn: async ({
       inventoryItemId,
-      inventoryId,
     }: {
       inventoryItemId: string;
       inventoryId: string;
