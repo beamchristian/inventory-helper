@@ -1,30 +1,25 @@
 // src/app/api/inventories/[inventoryId]/items/bulk/route.ts
 // This API route handles bulk operations for adding items to a specific inventory.
 
-import { NextResponse, type NextRequest } from "next/server"; // Import NextRequest
+// It's good practice to ensure DOM lib is referenced for Request/Response types in some environments
+/// <reference lib="dom" />
+
+import { NextResponse, type NextRequest } from "next/server"; // Import NextRequest for best practice, though Request also works
 import prisma from "@/lib/db/db"; // Use your shared prisma client instance
 import { auth } from "@/lib/auth"; // Import your custom auth helper
 
 /**
  * Handles POST requests to add all available master items to a specific Inventory.
  *
- * This endpoint will:
- * 1. Authenticate the user.
- * 2. Validate the inventory ID.
- * 3. Fetch all master items belonging to the authenticated user.
- * 4. Fetch all items currently associated with the specified inventory.
- * 5. Determine which master items are not yet in the inventory.
- * 6. Create new InventoryItem records for these missing items in bulk.
- *
- * @param {NextRequest} req - The incoming Next.js request object.
- * @param {object} context - Context object containing dynamic route parameters.
+ * @param {NextRequest} _req - The incoming Next.js request object. (Even if unused, it's needed for type compatibility)
+ * @param {object} context - Object containing dynamic route parameters.
  * @param {object} context.params - Dynamic route parameters.
- * @param {string} context.params.inventoryId - The ID of the inventory to add items to.
+ * @param {string} context.params.inventoryId - The ID of the inventory.
  * @returns {NextResponse} The response object with a count of items added.
  */
 export async function POST(
-  req: NextRequest, // Changed type from Request to NextRequest
-  context: { params: { inventoryId: string } } // Changed direct destructuring to a context object
+  _req: NextRequest, // Add NextRequest as the first parameter, even if unused. Use _req to signal it's intentionally unused.
+  context: { params: { inventoryId: string } } // Standard context typing for dynamic routes
 ) {
   try {
     const session = await auth(); // Get the server-side session
@@ -33,8 +28,7 @@ export async function POST(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    // Access inventoryId from context.params
-    const { inventoryId } = context.params;
+    const { inventoryId } = context.params; // Access from context.params
 
     if (!inventoryId) {
       return NextResponse.json(
@@ -103,7 +97,7 @@ export async function POST(
     const dataToCreate = itemsToAddToInventory.map((itemId) => ({
       inventory_id: inventoryId,
       counted_units: 0, // Default to 0 units when adding
-      item_id: itemId, // Ensure item_id is correctly mapped
+      item_id: itemId,
     }));
 
     // 6. Bulk create new InventoryItem records
