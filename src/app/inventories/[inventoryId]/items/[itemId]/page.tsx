@@ -1,11 +1,10 @@
+// src/app/inventories/[inventoryId]/items/[itemId]/page.tsx
 "use client";
 
-// Added useMemo to the React import
 import React, { useState, useCallback, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
-import { InventoryItem, Item } from "@/types";
+import { InventoryItem, Item } from "@/types"; // Ensure correct path for your types
 import {
   useInventoryItems,
   useUpdateInventoryItem,
@@ -14,10 +13,14 @@ import {
 // Import the reusable sort function we created
 import { sortForCountMode, sortForItemTypeOnly } from "@/lib/utils";
 
+// REMOVE ANY DIRECT SUPABASE IMPORTS LIKE THESE:
+// import { supabase } from '@supabase/supabase-js';
+// import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'; // Or similar
+
 /**
  * useInventoryItemDetails Hook
  * Fetches details for a specific inventory item, including its associated master item data.
- * (This hook remains unchanged)
+ * IMPORTANT: This hook now fetches data from your API route, not directly from Supabase.
  */
 const useInventoryItemDetails = (itemId: string | undefined) => {
   return useQuery<InventoryItem & { items: Item }>({
@@ -25,14 +28,17 @@ const useInventoryItemDetails = (itemId: string | undefined) => {
     queryFn: async () => {
       if (!itemId) throw new Error("Inventory Item ID is missing.");
 
-      const { data, error } = await supabase
-        .from("inventory_items")
-        .select(`*, items(*)`) // Select inventory_item and join with its related item
-        .eq("id", itemId)
-        .single();
+      // --- CRUCIAL CHANGE: Use fetch to call your API route ---
+      const response = await fetch(`/api/inventory-items/${itemId}`);
 
-      if (error) throw new Error(error.message);
-      if (!data) throw new Error("Inventory item not found.");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(
+          errorData.message || "Failed to fetch inventory item details."
+        );
+      }
+
+      const data: InventoryItem & { items: Item } = await response.json();
       return data;
     },
     enabled: !!itemId,
@@ -63,7 +69,6 @@ export default function InventoryItemDetailPage() {
     error: inventoryItemError,
   } = useInventoryItemDetails(itemId);
 
-  // --- MODIFICATION START ---
   // 2. Fetch the RAW, unsorted list of items
   const {
     data: rawInventoryItems, // Renamed to indicate it's unsorted
@@ -86,8 +91,6 @@ export default function InventoryItemDetailPage() {
         return sortForCountMode(rawInventoryItems);
     }
   }, [rawInventoryItems, sortMode]);
-
-  // --- MODIFICATION END ---
 
   const updateInventoryItemMutation = useUpdateInventoryItem();
 

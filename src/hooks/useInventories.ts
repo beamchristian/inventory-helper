@@ -1,107 +1,86 @@
 // src/hooks/useInventories.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "../lib/supabase";
-import { Inventory, UpdateInventoryArgs } from "../types"; // Adjust path
-import { useEffect, useState } from "react"; // For useAuthUserId
-
-// Re-use the useAuthUserId hook from useItems.ts or create a shared auth hook
-const useAuthUserId = () => {
-  const [userId, setUserId] = useState<string | null>(null);
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser(); // Also capture error here
-      if (error) {
-        console.error("Error fetching user in useAuthUserId:", error);
-      }
-      setUserId(user?.id || null);
-    };
-    fetchUser();
-    // No explicit dependencies needed here if fetchUser is stable or self-contained.
-    // If you add other variables that 'fetchUser' depends on, they should be added here.
-  }, []); // The empty array is correct if fetchUser doesn't depend on external changing values.
-  return userId;
-};
+import { Inventory } from "../types"; // Adjust path
 
 // Fetch all inventories for the logged-in user
 export const useInventories = () => {
-  const userId = useAuthUserId();
   return useQuery<Inventory[]>({
-    queryKey: ["inventories", userId],
+    queryKey: ["inventories"],
     queryFn: async () => {
-      if (!userId) return [];
-      const { data, error } = await supabase
-        .from("inventories")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false }); // Show newest first
-      if (error) throw new Error(error.message);
-      return data || [];
+      // No longer need this userId check, API route handles authentication
+      // if (!userId) { return []; }
+
+      const response = await fetch("/api/inventories"); // Call your new API route
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to fetch inventories.");
+      }
+      return response.json();
     },
-    enabled: !!userId,
   });
 };
 
 // Create a new inventory
 export const useCreateInventory = () => {
   const queryClient = useQueryClient();
-  const userId = useAuthUserId();
-  return useMutation<
-    Inventory, // Expected return type for successful mutation
-    Error, // Expected error type
-    { name: string; settings?: Record<string, unknown> } // Args type: use unknown for settings
-  >({
-    mutationFn: async (newInventory) => {
-      // 'newInventory' is now implicitly typed from the Mutation
-      if (!userId) throw new Error("User not authenticated.");
-      const inventoryToInsert = { ...newInventory, user_id: userId };
-      const { data, error } = await supabase
-        .from("inventories")
-        .insert(inventoryToInsert)
-        .select()
-        .single();
-      if (error) throw new Error(error.message);
-      return data;
+  return useMutation({
+    mutationFn: async (
+      newInventory: Omit<
+        Inventory,
+        "id" | "created_at" | "updated_at" | "user_id"
+      >
+    ) => {
+      // No user_id check here, it's added server-side
+      // if (!userId) throw new Error("User not authenticated.");
+      // const inventoryToInsert = { ...newInventory, user_id: userId }; // User ID added server-side
+
+      const response = await fetch("/api/inventories", {
+        // Call your new POST API route
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newInventory), // Send only the data the API expects
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to add inventory.");
+      }
+      return response.json();
     },
     onSuccess: () => {
-      // 'data' is now typed as Inventory
-      queryClient.invalidateQueries({ queryKey: ["inventories", userId] });
+      queryClient.invalidateQueries({ queryKey: ["inventories"] }); // Invalidate and refetch
     },
-    // No onError specified, so no 'any' here.
   });
 };
 
+// Update an existing inventory
 export const useUpdateInventory = () => {
   const queryClient = useQueryClient();
+  // REMOVE THIS LINE: const userId = useAuthUserId(); // No longer needed here
+  return useMutation({
+    mutationFn: async (
+      updatedInventory: Partial<Inventory> & { id: string }
+    ) => {
+      const response = await fetch(`/api/inventories/${updatedInventory.id}`, {
+        // Call your new PATCH API route
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedInventory),
+      });
 
-  return useMutation<Inventory, Error, UpdateInventoryArgs>({
-    mutationFn: async ({ id, status }) => {
-      const { data, error } = await supabase
-        .from("inventories")
-        .update({
-          status: status,
-          completed_at:
-            status === "completed" ? new Date().toISOString() : null,
-        })
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to update inventory.");
+      }
+      return response.json();
     },
-    onSuccess: (data, variables) => {
-      // 'data' is Inventory, 'variables' is UpdateInventoryArgs
-      // Invalidate queries to refetch the updated inventory list/details
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["inventories"] });
-      queryClient.invalidateQueries({ queryKey: ["inventory", variables.id] });
-      console.log(`Inventory ${data.name} status updated to ${data.status}`);
-    },
-    onError: (error) => {
-      // This was the line with 'any' before
-      console.error("Error updating inventory status:", error.message);
+      queryClient.invalidateQueries({ queryKey: ["inventory", variables.id] }); // If you have a single inventory query
     },
   });
 };
@@ -109,23 +88,25 @@ export const useUpdateInventory = () => {
 // Delete an inventory
 export const useDeleteInventory = () => {
   const queryClient = useQueryClient();
-  const userId = useAuthUserId();
-  return useMutation<
-    void, // Return type of the mutation (void because delete doesn't return data)
-    Error, // Error type
-    string // Argument type (inventoryId)
-  >({
+  // REMOVE THIS LINE: const userId = useAuthUserId(); // No longer needed here
+  return useMutation({
     mutationFn: async (inventoryId: string) => {
-      // 'inventoryId' is now typed
-      if (!userId) throw new Error("User not authenticated.");
-      const { error } = await supabase
-        .from("inventories")
-        .delete()
-        .eq("id", inventoryId);
-      if (error) throw new Error(error.message);
+      // No user_id check here
+      // if (!userId) throw new Error("User not authenticated.");
+
+      const response = await fetch(`/api/inventories/${inventoryId}`, {
+        // Call your new DELETE API route
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to delete inventory.");
+      }
+      // No data returned on successful delete
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["inventories", userId] });
+      queryClient.invalidateQueries({ queryKey: ["inventories"] });
     },
     // No onError specified, so no 'any' here.
   });

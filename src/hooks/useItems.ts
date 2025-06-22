@@ -1,110 +1,141 @@
 // src/hooks/useItems.ts
-"use client"
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
-import { Item } from '../types'; // Make sure this path is correct
-import { useEffect, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react"; // Import useSession for user ID
+import { Item } from "@/types"; // Adjust path if necessary
 
-// Custom hook to get the current authenticated user's ID
-// You might want to move this to a more general 'useAuth' hook later
-const useAuthUserId = () => {
-  const [userId, setUserId] = useState<string | null>(null); // Add useState
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUserId(user?.id || null);
-    };
-    fetchUser();
-    // Listen for auth changes to update user ID if necessary
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUserId(session?.user?.id || null);
-    });
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
-  }, []);
-  return userId;
+// Helper to handle API responses
+const handleApiResponse = async (response: Response) => {
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: response.statusText }));
+    throw new Error(errorData.message || `API error: ${response.status}`);
+  }
+  return response.json();
 };
 
-
-// Fetch all items for the logged-in user
+/**
+ * useItems Hook
+ * Fetches all items belonging to the authenticated user.
+ */
 export const useItems = () => {
-  const userId = useAuthUserId(); // Get current user's ID
+  const { data: session, status } = useSession(); // Get session to access user ID
+
   return useQuery<Item[]>({
-    queryKey: ['items', userId], // Query key now includes userId
+    queryKey: ["items", session?.user?.id], // Include userId in queryKey for re-fetching on login/logout
     queryFn: async () => {
-      if (!userId) {
-        // If no user ID, return empty array (or throw an error if items are strictly per user)
-        return [];
+      // Only fetch if authenticated
+      if (status !== "authenticated") {
+        throw new Error("Authentication required to fetch items.");
       }
-      const { data, error } = await supabase
-        .from('items')
-        .select('*')
-        .eq('user_id', userId) // Filter by user_id
-        .order('name', { ascending: true }); // Order alphabetically by name
-      if (error) throw new Error(error.message);
-      return data || [];
+
+      const response = await fetch("/api/items"); // Calls your new /api/items GET route
+      return handleApiResponse(response);
     },
-    enabled: !!userId, // Only run query if userId is available
+    // Enable query only when authenticated
+    enabled: status === "authenticated",
   });
 };
 
-// Add a new item
+/**
+ * useAddItem Hook
+ * Adds a new item for the authenticated user.
+ */
 export const useAddItem = () => {
   const queryClient = useQueryClient();
-  const userId = useAuthUserId(); // Get current user's ID
-  return useMutation({
-    mutationFn: async (newItem: Omit<Item, 'id' | 'created_at' | 'updated_at' | 'user_id'>) => {
-      if (!userId) throw new Error('User not authenticated.');
-      const itemToInsert = { ...newItem, user_id: userId };
-      const { data, error } = await supabase.from('items').insert(itemToInsert).select().single();
-      if (error) throw new Error(error.message);
-      return data;
+  const { data: session } = useSession(); // Get session for user ID
+
+  return useMutation<
+    Item,
+    Error,
+    Omit<Item, "id" | "created_at" | "updated_at" | "user_id">
+  >({
+    mutationFn: async (newItemData) => {
+      if (!session?.user?.id) {
+        throw new Error("User not authenticated.");
+      }
+
+      // Merge user_id with newItemData
+      const itemWithUserId = { ...newItemData, user_id: session.user.id };
+
+      const response = await fetch("/api/items", {
+        // Calls your new /api/items POST route
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(itemWithUserId),
+      });
+      return handleApiResponse(response);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', userId] }); // Invalidate and refetch items for the user
+      // Invalidate the 'items' query to refetch the list after a new item is added
+      queryClient.invalidateQueries({ queryKey: ["items"] });
     },
   });
 };
 
-// Update an existing item
+/**
+ * useUpdateItem Hook
+ * Updates an existing item for the authenticated user.
+ */
 export const useUpdateItem = () => {
   const queryClient = useQueryClient();
-  const userId = useAuthUserId(); // Get current user's ID
-  return useMutation({
-    mutationFn: async (updatedItem: Partial<Item> & { id: string }) => {
-      if (!userId) throw new Error('User not authenticated.');
-      // Ensure user_id is implicit via RLS, or explicitly passed if your RLS needs it
-      const { data, error } = await supabase
-        .from('items')
-        .update(updatedItem) // Supabase RLS will ensure only owner can update
-        .eq('id', updatedItem.id)
-        .select()
-        .single();
-      if (error) throw new Error(error.message);
-      return data;
+  const { data: session } = useSession();
+
+  return useMutation<Item, Error, Item>({
+    // Expects the full Item object to update
+    mutationFn: async (updatedItemData) => {
+      if (!session?.user?.id) {
+        throw new Error("User not authenticated.");
+      }
+      if (!updatedItemData.id) {
+        throw new Error("Item ID is required for update.");
+      }
+
+      const response = await fetch(`/api/items/${updatedItemData.id}`, {
+        // Calls /api/items/[itemId] PATCH route
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedItemData),
+      });
+      return handleApiResponse(response);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', userId] });
+    onSuccess: (data) => {
+      // Update the cache for the specific item, and invalidate the list
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      // Optionally, you can update the specific item in the cache if you need
+      // queryClient.setQueryData(["items", data.id], data);
     },
   });
 };
 
-// Delete an item
+/**
+ * useDeleteItem Hook
+ * Deletes an item for the authenticated user.
+ */
 export const useDeleteItem = () => {
   const queryClient = useQueryClient();
-  const userId = useAuthUserId(); // Get current user's ID
-  return useMutation({
-    mutationFn: async (itemId: string) => {
-      if (!userId) throw new Error('User not authenticated.');
-      const { error } = await supabase
-        .from('items')
-        .delete()
-        .eq('id', itemId); // Supabase RLS will ensure only owner can delete
-      if (error) throw new Error(error.message);
+  const { data: session } = useSession();
+
+  return useMutation<void, Error, string>({
+    // Expects item ID as a string
+    mutationFn: async (itemId) => {
+      if (!session?.user?.id) {
+        throw new Error("User not authenticated.");
+      }
+
+      const response = await fetch(`/api/items/${itemId}`, {
+        // Calls /api/items/[itemId] DELETE route
+        method: "DELETE",
+      });
+      return handleApiResponse(response); // Response might be empty or a message
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['items', userId] });
+      // Invalidate the 'items' query to refetch the list after deletion
+      queryClient.invalidateQueries({ queryKey: ["items"] });
     },
   });
 };

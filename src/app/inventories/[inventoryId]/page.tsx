@@ -1,56 +1,66 @@
-"use client";
+// src/app/inventories/[inventoryId]/page.tsx
+"use client"; // This page is a client component
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
-import { Inventory } from "@/types";
-import { useItems } from "@/hooks/useItems";
+import { useSession } from "next-auth/react"; // Import useSession for NextAuth.js
+import { Inventory, InventoryItem, Item } from "@/types"; // Adjust path if necessary
+import { useItems } from "@/hooks/useItems"; // Assumed to use new API routes for master items
 import {
   useInventoryItems,
   useAddInventoryItem,
   useDeleteInventoryItem,
-} from "../../../hooks/useInventoryItems";
-import { useUpdateInventory } from "../../../hooks/useInventories";
-import { sortForItemTypeOnly } from "@/lib/utils";
+  useUpdateInventoryItem,
+  useAddAllInventoryItems, // NEW: Import the new hook for adding all items
+} from "../../../hooks/useInventoryItems"; // Adjust path if necessary
+import { useUpdateInventory } from "../../../hooks/useInventories"; // Assumed to use new API routes
+import { sortForItemTypeOnly } from "@/lib/utils"; // Your utility function
 
-const useInventoryDetails = (inventoryId: string | undefined) => {
-  const [userId, setUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUserId(user?.id || null);
-    };
-    fetchUser();
-  }, []);
-
-  return useQuery<Inventory>({
-    queryKey: ["inventory", inventoryId],
-    queryFn: async () => {
-      if (!inventoryId || !userId) {
-        throw new Error("Inventory ID or User ID is missing.");
-      }
-      const { data, error } = await supabase
-        .from("inventories")
-        .select("*")
-        .eq("id", inventoryId)
-        .eq("user_id", userId)
-        .single();
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!inventoryId && !!userId,
-  });
-};
-
-const LoadingSpinner = () => (
+/**
+ * LoadingSpinner Component
+ * Displays a simple animated spinner.
+ */
+const LoadingSpinner: React.FC = () => (
   <div className='flex justify-center items-center h-20'>
     <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
   </div>
 );
+
+/**
+ * useInventoryDetails Custom Hook
+ * Fetches details for a specific inventory using a Next.js API route.
+ * Replaces direct Supabase call with a standard fetch.
+ * Assumes the API route handles user authorization.
+ */
+const useInventoryDetails = (inventoryId: string | undefined) => {
+  const { data: session, status } = useSession();
+
+  return useQuery<Inventory>({
+    queryKey: ["inventory", inventoryId],
+    queryFn: async () => {
+      if (!inventoryId) {
+        throw new Error("Inventory ID is missing.");
+      }
+      if (status !== "authenticated") {
+        throw new Error("Authentication required.");
+      }
+
+      const response = await fetch(`/api/inventories/${inventoryId}`);
+
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: response.statusText }));
+        throw new Error(
+          errorData.message || `Failed to fetch inventory: ${response.status}`
+        );
+      }
+      return response.json();
+    },
+    enabled: !!inventoryId && status === "authenticated",
+  });
+};
 
 type InventoryItemSortColumn =
   | "name"
@@ -61,11 +71,42 @@ type InventoryItemSortColumn =
   | "brand"
   | "item_type";
 
+// Helper type for the combined InventoryItem and Item relation (matches API include)
+type CombinedInventoryItem = InventoryItem & { item: Item };
+
+/**
+ * InventoryDetailPage Component
+ * Displays details of a specific inventory, including its items,
+ * and allows for managing (adding, deleting) those items.
+ */
 export default function InventoryDetailPage() {
   const router = useRouter();
   const params = useParams();
   const inventoryId = params.inventoryId as string;
 
+  const { data: session, status } = useSession();
+
+  const showMessage = (
+    message: string,
+    type: "info" | "error" | "success" = "info"
+  ) => {
+    const messageBox = document.getElementById("messageBox");
+    if (messageBox) {
+      messageBox.innerText = message;
+      messageBox.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg z-50 block `;
+      if (type === "error")
+        messageBox.classList.add("bg-red-500", "text-white");
+      else if (type === "success")
+        messageBox.classList.add("bg-green-500", "text-white");
+      else messageBox.classList.add("bg-blue-500", "text-white");
+      messageBox.style.display = "block";
+      setTimeout(() => {
+        if (messageBox) messageBox.style.display = "none";
+      }, 5000);
+    }
+  };
+
+  // --- Data Fetching and Mutations ---
   const {
     data: inventory,
     isLoading: isInventoryLoading,
@@ -77,36 +118,42 @@ export default function InventoryDetailPage() {
     isLoading: isAllItemsLoading,
     isError: isAllItemsError,
     error: allItemsError,
-  } = useItems();
+  } = useItems(); // Fetches master items
   const {
     data: currentInventoryItems,
     isLoading: isCurrentItemsLoading,
     isError: isCurrentItemsError,
     error: currentItemsError,
-  } = useInventoryItems(inventoryId);
+  } = useInventoryItems(inventoryId); // Fetches InventoryItems for THIS inventory
 
   const addInventoryItemMutation = useAddInventoryItem();
   const deleteInventoryItemMutation = useDeleteInventoryItem();
   const updateInventoryMutation = useUpdateInventory();
+  const updateInventoryItemMutation = useUpdateInventoryItem();
+  const addAllInventoryItemsMutation = useAddAllInventoryItems(); // NEW: Initialize the new mutation hook
 
+  // --- Component State ---
   const [sortColumn, setSortColumn] = useState<InventoryItemSortColumn>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-
-  // --- Pagination State ---
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10); // New state for items per page
-
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedItemIdToAdd, setSelectedItemIdToAdd] = useState<string>("");
+  const [editingInventoryItem, setEditingInventoryItem] =
+    useState<CombinedInventoryItem | null>(null);
 
-  // 👇 NEW handler for the ITEM TYPE count mode
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/sign-in");
+    }
+  }, [status, router]);
+
   const handleStartItemTypeCountMode = () => {
     if (!currentInventoryItems || currentInventoryItems.length === 0) {
-      alert("There are no items in this inventory to count.");
+      showMessage("There are no items in this inventory to count.", "info");
       return;
     }
     const sortedForCount = sortForItemTypeOnly(currentInventoryItems);
     const firstItemId = sortedForCount[0].id;
-    // Navigate with the 'itemType' sortMode parameter
     router.push(
       `/inventories/${inventoryId}/items/${firstItemId}?sortMode=itemType`
     );
@@ -138,7 +185,6 @@ export default function InventoryDetailPage() {
   }, [availableItemsToAdd, selectedItemIdToAdd]);
 
   const handleSort = (column: InventoryItemSortColumn) => {
-    // Reset to first page when sorting changes
     setCurrentPage(1);
     if (sortColumn === column) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -159,39 +205,40 @@ export default function InventoryDetailPage() {
 
       switch (sortColumn) {
         case "name":
-          aValue = a.items.name;
-          bValue = b.items.name;
+          aValue = (a as CombinedInventoryItem).item.name;
+          bValue = (b as CombinedInventoryItem).item.name;
           break;
         case "unit_type":
-          aValue = a.items.unit_type;
-          bValue = b.items.unit_type;
+          aValue = (a as CombinedInventoryItem).item.unit_type;
+          bValue = (b as CombinedInventoryItem).item.unit_type;
           break;
         case "upc_number":
-          aValue = a.items.upc_number;
-          bValue = b.items.upc_number;
+          aValue = (a as CombinedInventoryItem).item.upc_number;
+          bValue = (b as CombinedInventoryItem).item.upc_number;
           break;
         case "counted_units":
           aValue = a.counted_units;
           bValue = b.counted_units;
           break;
         case "calculated_weight":
-          // Need to calculate on the fly for sorting if not a direct DB column
           aValue =
-            (a.counted_units || 0) * (a.items.average_weight_per_unit || 0);
+            (a.counted_units || 0) *
+            ((a as CombinedInventoryItem).item.average_weight_per_unit || 0);
           bValue =
-            (b.counted_units || 0) * (b.items.average_weight_per_unit || 0);
+            (b.counted_units || 0) *
+            ((b as CombinedInventoryItem).item.average_weight_per_unit || 0);
           break;
         case "brand":
-          aValue = a.items.brand;
-          bValue = b.items.brand;
+          aValue = (a as CombinedInventoryItem).item.brand;
+          bValue = (b as CombinedInventoryItem).item.brand;
           break;
         case "item_type":
-          aValue = a.items.item_type;
-          bValue = b.items.item_type;
+          aValue = (a as CombinedInventoryItem).item.item_type;
+          bValue = (b as CombinedInventoryItem).item.item_type;
           break;
         default:
-          aValue = a.items.name;
-          bValue = b.items.name;
+          aValue = (a as CombinedInventoryItem).item.name;
+          bValue = (b as CombinedInventoryItem).item.name;
       }
 
       if (aValue === null || aValue === undefined)
@@ -218,7 +265,6 @@ export default function InventoryDetailPage() {
     return sortableItems;
   }, [currentInventoryItems, sortColumn, sortDirection]);
 
-  // --- Pagination Logic ---
   const totalItems = sortedInventoryItems.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const paginatedItems = useMemo(() => {
@@ -239,21 +285,20 @@ export default function InventoryDetailPage() {
     }
   };
 
-  // Handler for changing items per page
   const handleItemsPerPageChange = (
     event: React.ChangeEvent<HTMLSelectElement>
   ) => {
     setItemsPerPage(Number(event.target.value));
-    setCurrentPage(1); // Reset to first page when items per page changes
+    setCurrentPage(1);
   };
 
   const handleAddItemToInventory = async () => {
     if (!selectedItemIdToAdd) {
-      alert("Please select an item to add.");
+      showMessage("Please select an item to add.", "info");
       return;
     }
     if (!inventoryId) {
-      alert("Inventory ID is missing.");
+      showMessage("Inventory ID is missing.", "error");
       return;
     }
 
@@ -261,8 +306,9 @@ export default function InventoryDetailPage() {
       (invItem) => invItem.item_id === selectedItemIdToAdd
     );
     if (isAlreadyAdded) {
-      alert(
-        "This item has already been added to this inventory. Please select another item."
+      showMessage(
+        "This item has already been added to this inventory. Please select another item.",
+        "info"
       );
       return;
     }
@@ -273,22 +319,54 @@ export default function InventoryDetailPage() {
         item_id: selectedItemIdToAdd,
         counted_units: 0,
       });
-      alert("Item added to inventory!");
-      // Re-evaluate total pages and potentially jump to the new last page if needed
-      // For simplicity, we'll just invalidate and let react-query refetch.
-      // If the new item goes to a new page, the user will have to navigate there manually.
-      // A more complex solution might calculate the new page and set currentPage.
+      showMessage("Item added to inventory!", "success");
     } catch (err) {
       let errorMessage = "Unknown error adding item.";
       if (err instanceof Error) {
         errorMessage = err.message;
-        const supabaseError = err as Error & { code?: string };
-        if (supabaseError.code === "23505") {
+        if (
+          errorMessage.includes("Unique constraint failed") ||
+          errorMessage.includes("P2002") ||
+          errorMessage.includes("already exists")
+        ) {
           errorMessage =
             "This item has already been added to this inventory. Please select another item.";
         }
       }
-      alert(`Error adding item to inventory: ${errorMessage}`);
+      showMessage(`Error adding item to inventory: ${errorMessage}`, "error");
+    }
+  };
+
+  // NEW: Handler for adding all remaining items
+  const handleAddAllRemainingItemsToInventory = async () => {
+    if (!inventoryId) {
+      showMessage("Inventory ID is missing.", "error");
+      return;
+    }
+    if (availableItemsToAdd.length === 0) {
+      showMessage("All available items are already in this inventory.", "info");
+      return;
+    }
+
+    // Confirmation before adding all items
+    const userConfirmed = window.confirm(
+      `Are you sure you want to add all ${availableItemsToAdd.length} remaining items to this inventory?`
+    );
+
+    if (!userConfirmed) {
+      return;
+    }
+
+    try {
+      // The mutation will send the inventoryId, and the API will handle finding all available items
+      await addAllInventoryItemsMutation.mutateAsync(inventoryId);
+      showMessage("All remaining items added to inventory!", "success");
+    } catch (err) {
+      let errorMessage = "Unknown error adding all items.";
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      showMessage(`Error adding all items: ${errorMessage}`, "error");
     }
   };
 
@@ -296,67 +374,127 @@ export default function InventoryDetailPage() {
     invItemId: string,
     itemName: string
   ) => {
-    if (!inventoryId) return;
-    if (
-      confirm(
-        `Are you sure you want to remove "${itemName}" from this inventory?`
-      )
-    ) {
+    if (!inventoryId) {
+      showMessage("Inventory ID is missing.", "error");
+      return;
+    }
+
+    const userConfirmed = window.confirm(
+      `Are you sure you want to remove "${itemName}" from this inventory?`
+    );
+
+    if (userConfirmed) {
       try {
         await deleteInventoryItemMutation.mutateAsync({
           inventoryItemId: invItemId,
           inventoryId: inventoryId,
         });
-        alert(`"${itemName}" removed from inventory.`);
-        // If the last item on a page is deleted, and it's not the first page,
-        // navigate back one page.
+        showMessage(`"${itemName}" removed from inventory.`, "success");
         if (paginatedItems.length === 1 && currentPage > 1) {
           setCurrentPage(currentPage - 1);
         }
       } catch (err) {
-        alert(
+        showMessage(
           `Error removing item: ${
             err instanceof Error ? err.message : "Unknown error"
-          }`
+          }`,
+          "error"
         );
       }
     }
   };
 
-  const handleCompleteInventory = async () => {
-    if (!inventory?.id) {
-      alert("Inventory ID is not available to complete.");
-      return;
-    }
-    if (inventory.status === "completed") {
-      alert("This inventory is already completed.");
+  // Handler for updating counted units of an InventoryItem
+  const handleUpdateCountedUnits = async (
+    invItemId: string,
+    currentCount: number,
+    itemUnitType: string
+  ) => {
+    const newCount = prompt(
+      `Enter new count for item (current: ${currentCount} ${itemUnitType}):`
+    );
+    if (newCount === null) {
+      // User cancelled prompt
       return;
     }
 
-    if (
-      confirm(
-        "Are you sure you want to complete this inventory? This action cannot be undone."
-      )
-    ) {
+    const parsedCount = parseFloat(newCount);
+    if (isNaN(parsedCount) || parsedCount < 0) {
+      showMessage(
+        "Invalid count. Please enter a non-negative number.",
+        "error"
+      );
+      return;
+    }
+
+    if (!inventoryId) {
+      showMessage("Inventory ID is missing.", "error");
+      return;
+    }
+
+    try {
+      await updateInventoryItemMutation.mutateAsync({
+        id: invItemId,
+        counted_units: parsedCount,
+        inventory_id: inventoryId, // Pass inventory_id for invalidation
+      });
+      showMessage("Item count updated successfully!", "success");
+    } catch (err) {
+      showMessage(
+        `Error updating item count: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`,
+        "error"
+      );
+    }
+  };
+
+  const handleCompleteInventory = async () => {
+    if (!inventory?.id) {
+      showMessage("Inventory ID is not available to complete.", "error");
+      return;
+    }
+    if (inventory.status === "completed") {
+      showMessage("This inventory is already completed.", "info");
+      return;
+    }
+
+    const userConfirmed = window.confirm(
+      "Are you sure you want to complete this inventory? This action cannot be undone."
+    );
+
+    if (userConfirmed) {
       try {
         await updateInventoryMutation.mutateAsync({
           id: inventory.id,
           status: "completed",
         });
-        alert(`Inventory "${inventory.name}" has been marked as completed.`);
+        showMessage(
+          `Inventory "${inventory.name}" has been marked as completed.`,
+          "success"
+        );
       } catch (err) {
-        alert(
+        showMessage(
           `Error completing inventory: ${
             err instanceof Error ? err.message : "Unknown error"
-          }`
+          }`,
+          "error"
         );
       }
     }
   };
 
   const isAnyLoading =
-    isInventoryLoading || isAllItemsLoading || isCurrentItemsLoading;
-  const isAnyError = isInventoryError || isAllItemsError || isCurrentItemsError;
+    isInventoryLoading ||
+    isAllItemsLoading ||
+    isCurrentItemsLoading ||
+    status === "loading" ||
+    addAllInventoryItemsMutation.isPending; // Include the new mutation's loading state
+  const isAnyError =
+    isInventoryError ||
+    isAllItemsError ||
+    isCurrentItemsError ||
+    status === "unauthenticated";
 
   if (isAnyLoading) {
     return (
@@ -370,8 +508,20 @@ export default function InventoryDetailPage() {
     const errorMessage =
       inventoryError?.message ||
       allItemsError?.message ||
-      currentItemsError?.message;
-    const isNotFound = errorMessage?.includes("Row not found");
+      currentItemsError?.message ||
+      (status === "unauthenticated"
+        ? "You are not authenticated to view this page."
+        : "An unknown error occurred.");
+
+    if (
+      status === "unauthenticated" ||
+      errorMessage.includes("Authentication required.")
+    ) {
+      router.push("/auth/sign-in");
+      return null;
+    }
+
+    const isNotFound = errorMessage?.includes("not found");
 
     return (
       <div className='min-h-screen flex items-center justify-center bg-background-base'>
@@ -414,12 +564,17 @@ export default function InventoryDetailPage() {
 
   return (
     <div className='container mx-auto p-4 max-w-5xl min-h-screen bg-background-base'>
+      {/* Custom Message Box for alerts */}
+      <div
+        id='messageBox'
+        className='fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50 hidden'
+      ></div>
+
       <header className='flex flex-col sm:flex-row justify-between items-center mb-8 gap-4'>
         <h1 className='text-3xl font-bold text-text-base text-center sm:text-left'>
           Inventory: {inventory.name}
         </h1>
         <div className='flex flex-col sm:flex-row gap-2'>
-          {/* 👇 NEW "Count by Type" button */}
           <button
             onClick={handleStartItemTypeCountMode}
             disabled={
@@ -466,7 +621,8 @@ export default function InventoryDetailPage() {
             className='flex-grow min-w-[150px] p-2 border border-border-base rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background-surface text-text-base'
             disabled={
               addInventoryItemMutation.isPending ||
-              availableItemsToAdd.length === 0
+              availableItemsToAdd.length === 0 ||
+              addAllInventoryItemsMutation.isPending // Disable if bulk add is pending
             }
           >
             {availableItemsToAdd.length === 0 ? (
@@ -484,11 +640,26 @@ export default function InventoryDetailPage() {
             disabled={
               addInventoryItemMutation.isPending ||
               availableItemsToAdd.length === 0 ||
-              !selectedItemIdToAdd
+              !selectedItemIdToAdd ||
+              addAllInventoryItemsMutation.isPending // Disable if bulk add is pending
             }
             className='bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
           >
             {addInventoryItemMutation.isPending ? "Adding..." : "Add Item"}
+          </button>
+          {/* NEW: Add All Remaining Items Button */}
+          <button
+            onClick={handleAddAllRemainingItemsToInventory}
+            disabled={
+              addAllInventoryItemsMutation.isPending ||
+              availableItemsToAdd.length === 0 ||
+              addInventoryItemMutation.isPending // Disable if single add is pending
+            }
+            className='bg-success hover:bg-success/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
+          >
+            {addAllInventoryItemsMutation.isPending
+              ? "Adding All..."
+              : "Add All Remaining Items"}
           </button>
         </div>
 
@@ -588,29 +759,35 @@ export default function InventoryDetailPage() {
                       className='hover:bg-background-base/50'
                     >
                       <td className='py-2 px-4 border-b border-border-base text-text-base'>
-                        {invItem.items.name}
+                        {(invItem as CombinedInventoryItem).item?.name || "N/A"}{" "}
                       </td>
                       <td className='py-2 px-4 border-b border-border-base text-text-base'>
-                        {invItem.items.brand || "N/A"}{" "}
+                        {(invItem as CombinedInventoryItem).item?.brand ||
+                          "N/A"}{" "}
                       </td>
                       <td className='py-2 px-4 border-b border-border-base capitalize text-text-base'>
-                        {invItem.items.item_type || "N/A"}{" "}
+                        {(invItem as CombinedInventoryItem).item?.item_type ||
+                          "N/A"}{" "}
                       </td>
                       <td className='py-2 px-4 border-b border-border-base capitalize text-text-base'>
-                        {invItem.items.unit_type}
+                        {(invItem as CombinedInventoryItem).item?.unit_type ||
+                          "N/A"}
                       </td>
                       <td className='py-2 px-4 border-b border-border-base text-text-base'>
-                        {invItem.items.upc_number || "N/A"}{" "}
+                        {(invItem as CombinedInventoryItem).item?.upc_number ||
+                          "N/A"}{" "}
                       </td>
                       <td className='py-2 px-4 border-b border-border-base text-text-base'>
                         {invItem.counted_units} units
                       </td>
                       <td className='py-2 px-4 border-b border-border-base text-text-base'>
-                        {invItem.items.unit_type === "weight"
+                        {(invItem as CombinedInventoryItem).item?.unit_type ===
+                        "weight"
                           ? `${
                               (
                                 (invItem.counted_units || 0) *
-                                (invItem.items.average_weight_per_unit || 0)
+                                ((invItem as CombinedInventoryItem).item
+                                  ?.average_weight_per_unit || 0)
                               ).toFixed(2) || "0.00"
                             } lbs`
                           : "-"}
@@ -628,9 +805,23 @@ export default function InventoryDetailPage() {
                         </button>
                         <button
                           onClick={() =>
+                            handleUpdateCountedUnits(
+                              invItem.id,
+                              invItem.counted_units,
+                              (invItem as CombinedInventoryItem).item
+                                ?.unit_type || "units"
+                            )
+                          }
+                          className='bg-accent hover:bg-accent/80 text-text-inverse text-sm py-1 px-2 rounded'
+                        >
+                          Update Count
+                        </button>
+                        <button
+                          onClick={() =>
                             handleDeleteInventoryItem(
                               invItem.id,
-                              invItem.items.name
+                              (invItem as CombinedInventoryItem).item?.name ||
+                                "Unknown Item"
                             )
                           }
                           className='bg-error hover:bg-error/90 text-text-inverse text-sm py-1 px-2 rounded'

@@ -1,14 +1,15 @@
-"use client";
+// src/app/settings/page.tsx
+"use client"; // This page is a client component
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useSession } from "next-auth/react"; // Import useSession
 import {
   useItems,
   useAddItem,
   useUpdateItem,
   useDeleteItem,
-} from "../../hooks/useItems"; // Adjust path
-import { Item } from "../../types"; // Adjust path
-import { supabase } from "../../lib/supabase"; // Adjust path
+} from "../../hooks/useItems"; // Adjust path if necessary
+import { Item } from "../../types"; // Adjust path if necessary
 
 // Simple loading spinner component
 const LoadingSpinner = () => (
@@ -17,6 +18,26 @@ const LoadingSpinner = () => (
     <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
   </div>
 );
+
+// Custom Message Box for alerts/notifications
+const showMessage = (
+  message: string,
+  type: "info" | "error" | "success" = "info"
+) => {
+  const messageBox = document.getElementById("settingsMessageBox"); // Use a unique ID for settings page
+  if (messageBox) {
+    messageBox.innerText = message;
+    messageBox.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg z-50 block `;
+    if (type === "error") messageBox.classList.add("bg-red-500", "text-white");
+    else if (type === "success")
+      messageBox.classList.add("bg-green-500", "text-white");
+    else messageBox.classList.add("bg-blue-500", "text-white");
+    messageBox.style.display = "block";
+    setTimeout(() => {
+      if (messageBox) messageBox.style.display = "none";
+    }, 5000); // Message disappears after 5 seconds
+  }
+};
 
 // Define the type for sortable columns
 type SortColumn =
@@ -28,11 +49,24 @@ type SortColumn =
   | "brand";
 
 export default function SettingsPage() {
-  const [userId, setUserId] = useState<string | null>(null);
+  const { data: session, status } = useSession(); // Get session and status
+  // No need for local userId state and useEffect to fetch it from Supabase
+
   const { data: items, isLoading, isError, error } = useItems();
   const addItemMutation = useAddItem();
   const updateItemMutation = useUpdateItem();
   const deleteItemMutation = useDeleteItem();
+
+  // Define errorMessage at a higher scope
+  const errorMessage = useMemo(() => {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === "string") {
+      return error;
+    }
+    return "Unknown error.";
+  }, [error]);
 
   // State for sorting
   const [sortColumn, setSortColumn] = useState<SortColumn>("name");
@@ -57,15 +91,13 @@ export default function SettingsPage() {
   // State for the "Edit Item" form (when an item is being edited)
   const [editingItem, setEditingItem] = useState<Item | null>(null);
 
+  // Client-side authentication check: If not authenticated, redirect
+  // (Primary redirect happens in layout.tsx, this is a fallback for dynamic auth changes)
   useEffect(() => {
-    const fetchUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUserId(user?.id || null);
-    };
-    fetchUser();
-  }, []);
+    if (status === "unauthenticated") {
+      window.location.href = "/auth/sign-in"; // Use window.location for hard redirect
+    }
+  }, [status]);
 
   // Handler for changes in the "Add New Item" form
   const handleNewItemChange = (
@@ -86,7 +118,37 @@ export default function SettingsPage() {
   };
 
   const handleAddItem = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent default form submission to handle validation client-side
+
+    if (status !== "authenticated") {
+      showMessage("You must be logged in to add items.", "error");
+      return;
+    }
+
+    // --- Client-side validation ---
+    if (!newItemForm.name.trim()) {
+      // Check if name is empty or just whitespace
+      showMessage("Item Name is required.", "error");
+      return;
+    }
+    if (!newItemForm.unit_type) {
+      // Check if unit_type is selected
+      showMessage("Unit Type is required.", "error");
+      return;
+    }
+    if (
+      newItemForm.unit_type === "weight" &&
+      (newItemForm.average_weight_per_unit === null ||
+        newItemForm.average_weight_per_unit <= 0)
+    ) {
+      showMessage(
+        "Average Weight Per Unit is required for 'Weight' items and must be greater than 0.",
+        "error"
+      );
+      return;
+    }
+    // --- End client-side validation ---
+
     try {
       // Ensure average_weight_per_unit is null if unit_type is 'quantity'
       const itemToSave = {
@@ -106,12 +168,14 @@ export default function SettingsPage() {
         item_type: null,
         brand: null,
       });
-      alert("Item added successfully!");
-    } catch (err) {
-      alert(
+      showMessage("Item added successfully!", "success");
+    } catch (err: unknown) {
+      // Explicitly type 'err' as unknown
+      showMessage(
         `Error adding item: ${
           err instanceof Error ? err.message : "Unknown error"
-        }`
+        }`,
+        "error"
       );
     }
   };
@@ -138,6 +202,33 @@ export default function SettingsPage() {
   const handleUpdateItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingItem) return;
+    if (status !== "authenticated") {
+      showMessage("You must be logged in to update items.", "error");
+      return;
+    }
+
+    // --- Client-side validation for edit form ---
+    if (!editingItem.name.trim()) {
+      showMessage("Item Name is required.", "error");
+      return;
+    }
+    if (!editingItem.unit_type) {
+      showMessage("Unit Type is required.", "error");
+      return;
+    }
+    if (
+      editingItem.unit_type === "weight" &&
+      (editingItem.average_weight_per_unit === null ||
+        editingItem.average_weight_per_unit <= 0)
+    ) {
+      showMessage(
+        "Average Weight Per Unit is required for 'Weight' items and must be greater than 0.",
+        "error"
+      );
+      return;
+    }
+    // --- End client-side validation for edit form ---
+
     try {
       // Ensure average_weight_per_unit is null if unit_type is 'quantity'
       const itemToUpdate = {
@@ -149,30 +240,39 @@ export default function SettingsPage() {
       };
       await updateItemMutation.mutateAsync(itemToUpdate); // Pass the updated item with corrected weight
       setEditingItem(null); // Exit edit mode
-      alert("Item updated successfully!");
-    } catch (err) {
-      alert(
+      showMessage("Item updated successfully!", "success");
+    } catch (err: unknown) {
+      // Explicitly type 'err' as unknown
+      showMessage(
         `Error updating item: ${
           err instanceof Error ? err.message : "Unknown error"
-        }`
+        }`,
+        "error"
       );
     }
   };
 
   const handleDeleteItem = async (itemId: string) => {
+    if (status !== "authenticated") {
+      showMessage("You must be logged in to delete items.", "error");
+      return;
+    }
+    // Using window.confirm for now, but recommend replacing with custom modal
     if (
-      confirm(
+      window.confirm(
         "Are you sure you want to delete this item? This action cannot be undone."
       )
     ) {
       try {
         await deleteItemMutation.mutateAsync(itemId);
-        alert("Item deleted successfully!");
-      } catch (err) {
-        alert(
+        showMessage("Item deleted successfully!", "success");
+      } catch (err: unknown) {
+        // Explicitly type 'err' as unknown
+        showMessage(
           `Error deleting item: ${
             err instanceof Error ? err.message : "Unknown error"
-          }`
+          }`,
+          "error"
         );
       }
     }
@@ -181,10 +281,8 @@ export default function SettingsPage() {
   // Sorting logic
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
-      // If the same column is clicked, reverse the sort direction
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
-      // If a new column is clicked, sort by that column in ascending order
       setSortColumn(column);
       setSortDirection("asc");
     }
@@ -194,7 +292,7 @@ export default function SettingsPage() {
   const paginatedItems = useMemo(() => {
     if (!items) return [];
 
-    const sortableItems = [...items]; // Create a shallow copy to avoid mutating the original array
+    const sortableItems = [...items];
 
     sortableItems.sort((a, b) => {
       const aValue = a[sortColumn];
@@ -246,12 +344,44 @@ export default function SettingsPage() {
     setCurrentPage(1); // Reset to first page when items per page changes
   };
 
-  if (!userId) {
-    return <LoadingSpinner />; // Or a message like "Please log in"
+  // Show loading spinner if session is loading or items are loading
+  if (status === "loading" || isLoading) {
+    return (
+      <div className='min-h-screen flex items-center justify-center bg-background-base'>
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // Show error message if not authenticated or other error occurs
+  if (status === "unauthenticated" || isError) {
+    return (
+      <div className='min-h-screen flex items-center justify-center bg-background-base'>
+        <div className='text-center p-6 bg-background-surface rounded-lg shadow-md'>
+          <p className='text-error text-lg mb-4'>
+            {status === "unauthenticated"
+              ? "You must be logged in to view settings."
+              : `Error loading items: ${errorMessage}`}
+          </p>
+          <button
+            onClick={() => (window.location.href = "/auth/sign-in")} // Hard redirect to login page
+            className='mt-4 bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded'
+          >
+            Go to Sign In
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className='container mx-auto p-4 max-w-4xl'>
+      {/* Custom Message Box for alerts */}
+      <div
+        id='settingsMessageBox'
+        className='fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50 hidden'
+      ></div>
+
       <h1 className='text-3xl font-bold mb-6 text-center text-foreground'>
         Manage Inventory Items
       </h1>
@@ -395,7 +525,7 @@ export default function SettingsPage() {
         </h2>
         {isLoading && <LoadingSpinner />}
         {isError && (
-          <p className='text-error'>Error loading items: {error?.message}</p>
+          <p className='text-error'>Error loading items: {errorMessage}</p>
         )}
         {!isLoading && !isError && items && items.length === 0 && (
           <p className='text-text-muted'>

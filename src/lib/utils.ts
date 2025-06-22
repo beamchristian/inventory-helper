@@ -1,5 +1,7 @@
 // src/lib/utils.ts
 import { InventoryItem, Item } from "@/types";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
 
 type CountableItem = InventoryItem & { items: Item };
 
@@ -58,3 +60,7 @@ export const sortForItemTypeOnly = (
   });
   return sortableItems;
 };
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
