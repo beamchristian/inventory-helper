@@ -1,7 +1,7 @@
 // src/app/api/inventories/[inventoryId]/items/bulk/route.ts
 // This API route handles bulk operations for adding items to a specific inventory.
 
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server"; // Import NextRequest
 import prisma from "@/lib/db/db"; // Use your shared prisma client instance
 import { auth } from "@/lib/auth"; // Import your custom auth helper
 
@@ -16,14 +16,15 @@ import { auth } from "@/lib/auth"; // Import your custom auth helper
  * 5. Determine which master items are not yet in the inventory.
  * 6. Create new InventoryItem records for these missing items in bulk.
  *
- * @param {Request} req - The incoming request object.
- * @param {object} params - Next.js dynamic route parameters.
- * @param {string} params.inventoryId - The ID of the inventory to add items to.
+ * @param {NextRequest} req - The incoming Next.js request object.
+ * @param {object} context - Context object containing dynamic route parameters.
+ * @param {object} context.params - Dynamic route parameters.
+ * @param {string} context.params.inventoryId - The ID of the inventory to add items to.
  * @returns {NextResponse} The response object with a count of items added.
  */
 export async function POST(
-  req: Request,
-  { params }: { params: { inventoryId: string } }
+  req: NextRequest, // Changed type from Request to NextRequest
+  context: { params: { inventoryId: string } } // Changed direct destructuring to a context object
 ) {
   try {
     const session = await auth(); // Get the server-side session
@@ -32,7 +33,8 @@ export async function POST(
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const { inventoryId } = params;
+    // Access inventoryId from context.params
+    const { inventoryId } = context.params;
 
     if (!inventoryId) {
       return NextResponse.json(
@@ -62,7 +64,6 @@ export async function POST(
         user_id: session.user.id,
       },
       select: {
-        // Only select the ID, as we just need to know which items exist
         id: true,
       },
     });
@@ -76,7 +77,6 @@ export async function POST(
         inventory_id: inventoryId,
       },
       select: {
-        // Only select the item_id to check for existing associations
         item_id: true,
       },
     });
@@ -102,8 +102,8 @@ export async function POST(
     // 5. Prepare data for bulk creation
     const dataToCreate = itemsToAddToInventory.map((itemId) => ({
       inventory_id: inventoryId,
-      item_id: itemId,
       counted_units: 0, // Default to 0 units when adding
+      item_id: itemId, // Ensure item_id is correctly mapped
     }));
 
     // 6. Bulk create new InventoryItem records
@@ -117,9 +117,7 @@ export async function POST(
       { status: 201 }
     );
   } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
     console.error("Error adding all items to inventory:", error);
-    // Safely access error.message
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json(
