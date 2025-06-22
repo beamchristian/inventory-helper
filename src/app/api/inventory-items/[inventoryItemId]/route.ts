@@ -14,7 +14,7 @@ async function getUserIdFromSession() {
   return session.user.id;
 }
 
-// GET handler for a single InventoryItem (replaces the supabase call in your hook)
+// GET handler for a single InventoryItem
 export async function GET(
   request: Request,
   { params }: { params: { inventoryItemId: string } }
@@ -28,7 +28,7 @@ export async function GET(
         id: inventoryItemId,
       },
       include: {
-        item: true, // Include the related Item data
+        item: true, // Include the related Item data (singular 'item')
         inventory: true, // Include the related Inventory to check userId
       },
     });
@@ -48,28 +48,22 @@ export async function GET(
       );
     }
 
-    // Supabase's `select(*, items(*))` structure puts the item details directly under `items`.
-    // Prisma's `include` puts it under the `item` property.
-    // We'll transform the response to match your existing client-side type `InventoryItem & { items: Item }`.
-    const formattedInventoryItem = {
-      ...inventoryItem,
-      items: inventoryItem.item, // Renaming 'item' to 'items' for compatibility
-    };
-    // Clean up unnecessary nested objects if you don't need them on the client
-    delete (formattedInventoryItem as any).item;
-    delete (formattedInventoryItem as any).inventory; // Don't expose full inventory object if not needed
-
-    return NextResponse.json(formattedInventoryItem);
-  } catch (error: any) {
+    // Return the inventoryItem directly. The client's CombinedInventoryItem type expects 'item' (singular).
+    // No transformation from 'item' to 'items' is needed here.
+    return NextResponse.json(inventoryItem);
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error fetching single inventory item:", error);
-    if (error.message === "User not authenticated.") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (errorMessage.includes("User not authenticated.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to fetch inventory item details." },
+      { message: errorMessage || "Failed to fetch inventory item details." },
       { status: 500 }
     );
   }
@@ -109,35 +103,31 @@ export async function PATCH(
       where: { id: inventoryItemId },
       data: {
         counted_units: body.counted_units,
-        calculated_weight: body.calculated_weight, // Ensure this is also updated if your type supports it
+        // calculated_weight: body.calculated_weight, // Only include if it's explicitly part of the update payload
         updated_at: new Date(),
+      },
+      include: {
+        // Include item to return the full CombinedInventoryItem type
+        item: true,
       },
     });
 
-    // Re-fetch with item relation to match client expectations
-    const finalUpdatedItem = await prisma.inventoryItem.findUnique({
-      where: { id: updatedInventoryItem.id },
-      include: { item: true, inventory: true },
-    });
-
-    const formattedUpdatedItem = {
-      ...finalUpdatedItem,
-      items: finalUpdatedItem?.item,
-    };
-    delete (formattedUpdatedItem as any)?.item;
-    delete (formattedUpdatedItem as any)?.inventory;
-
-    return NextResponse.json(formattedUpdatedItem);
-  } catch (error: any) {
+    // Return the updatedInventoryItem directly.
+    // The client's CombinedInventoryItem type expects 'item' (singular).
+    return NextResponse.json(updatedInventoryItem);
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error updating inventory item:", error);
-    if (error.message === "User not authenticated.") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (errorMessage.includes("User not authenticated.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to update inventory item." },
+      { message: errorMessage || "Failed to update inventory item." },
       { status: 500 }
     );
   }
@@ -181,16 +171,19 @@ export async function DELETE(
       { message: "Inventory item deleted successfully." },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error deleting inventory item:", error);
-    if (error.message === "User not authenticated.") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (errorMessage.includes("User not authenticated.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to delete inventory item." },
+      { message: errorMessage || "Failed to delete inventory item." },
       { status: 500 }
     );
   }

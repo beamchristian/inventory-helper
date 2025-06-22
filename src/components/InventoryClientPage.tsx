@@ -3,7 +3,6 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link"; // For navigation within the client component
 
 // Import your custom hooks for inventories
 import {

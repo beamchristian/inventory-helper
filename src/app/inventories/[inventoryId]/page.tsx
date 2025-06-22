@@ -34,8 +34,8 @@ const LoadingSpinner: React.FC = () => (
  * Assumes the API route handles user authorization.
  */
 const useInventoryDetails = (inventoryId: string | undefined) => {
-  const { data: session, status } = useSession();
-
+  const { data: sessionData, status } = useSession(); // Fixed: Destructure as sessionData
+  console.log(sessionData);
   return useQuery<Inventory>({
     queryKey: ["inventory", inventoryId],
     queryFn: async () => {
@@ -84,8 +84,8 @@ export default function InventoryDetailPage() {
   const params = useParams();
   const inventoryId = params.inventoryId as string;
 
-  const { data: session, status } = useSession();
-
+  const { data: sessionData, status } = useSession(); // Fixed: Destructure as sessionData
+  console.log(sessionData);
   const showMessage = (
     message: string,
     type: "info" | "error" | "success" = "info"
@@ -130,7 +130,7 @@ export default function InventoryDetailPage() {
   const deleteInventoryItemMutation = useDeleteInventoryItem();
   const updateInventoryMutation = useUpdateInventory();
   const updateInventoryItemMutation = useUpdateInventoryItem();
-  const addAllInventoryItemsMutation = useAddAllInventoryItems(); // NEW: Initialize the new mutation hook
+  const addAllInventoryItemsMutation = useAddAllInventoryItems();
 
   // --- Component State ---
   const [sortColumn, setSortColumn] = useState<InventoryItemSortColumn>("name");
@@ -138,8 +138,6 @@ export default function InventoryDetailPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedItemIdToAdd, setSelectedItemIdToAdd] = useState<string>("");
-  const [editingInventoryItem, setEditingInventoryItem] =
-    useState<CombinedInventoryItem | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -337,7 +335,6 @@ export default function InventoryDetailPage() {
     }
   };
 
-  // NEW: Handler for adding all remaining items
   const handleAddAllRemainingItemsToInventory = async () => {
     if (!inventoryId) {
       showMessage("Inventory ID is missing.", "error");
@@ -348,7 +345,6 @@ export default function InventoryDetailPage() {
       return;
     }
 
-    // Confirmation before adding all items
     const userConfirmed = window.confirm(
       `Are you sure you want to add all ${availableItemsToAdd.length} remaining items to this inventory?`
     );
@@ -358,7 +354,6 @@ export default function InventoryDetailPage() {
     }
 
     try {
-      // The mutation will send the inventoryId, and the API will handle finding all available items
       await addAllInventoryItemsMutation.mutateAsync(inventoryId);
       showMessage("All remaining items added to inventory!", "success");
     } catch (err) {
@@ -404,7 +399,6 @@ export default function InventoryDetailPage() {
     }
   };
 
-  // Handler for updating counted units of an InventoryItem
   const handleUpdateCountedUnits = async (
     invItemId: string,
     currentCount: number,
@@ -489,7 +483,7 @@ export default function InventoryDetailPage() {
     isAllItemsLoading ||
     isCurrentItemsLoading ||
     status === "loading" ||
-    addAllInventoryItemsMutation.isPending; // Include the new mutation's loading state
+    addAllInventoryItemsMutation.isPending;
   const isAnyError =
     isInventoryError ||
     isAllItemsError ||
@@ -622,7 +616,7 @@ export default function InventoryDetailPage() {
             disabled={
               addInventoryItemMutation.isPending ||
               availableItemsToAdd.length === 0 ||
-              addAllInventoryItemsMutation.isPending // Disable if bulk add is pending
+              addAllInventoryItemsMutation.isPending
             }
           >
             {availableItemsToAdd.length === 0 ? (
@@ -641,19 +635,18 @@ export default function InventoryDetailPage() {
               addInventoryItemMutation.isPending ||
               availableItemsToAdd.length === 0 ||
               !selectedItemIdToAdd ||
-              addAllInventoryItemsMutation.isPending // Disable if bulk add is pending
+              addAllInventoryItemsMutation.isPending
             }
             className='bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
           >
             {addInventoryItemMutation.isPending ? "Adding..." : "Add Item"}
           </button>
-          {/* NEW: Add All Remaining Items Button */}
           <button
             onClick={handleAddAllRemainingItemsToInventory}
             disabled={
               addAllInventoryItemsMutation.isPending ||
               availableItemsToAdd.length === 0 ||
-              addInventoryItemMutation.isPending // Disable if single add is pending
+              addInventoryItemMutation.isPending
             }
             className='bg-success hover:bg-success/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
           >
@@ -670,7 +663,6 @@ export default function InventoryDetailPage() {
             </p>
           ) : (
             <>
-              {/* Items per page dropdown */}
               <div className='flex items-center justify-end mb-4'>
                 <label htmlFor='itemsPerPage' className='text-text-muted mr-2'>
                   Items per page:
@@ -834,7 +826,6 @@ export default function InventoryDetailPage() {
                 </tbody>
               </table>
 
-              {/* --- Streamlined Pagination Controls --- */}
               {totalPages > 1 && (
                 <div className='mt-6 flex justify-between items-center px-4'>
                   <button

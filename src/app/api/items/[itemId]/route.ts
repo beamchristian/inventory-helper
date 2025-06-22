@@ -42,16 +42,19 @@ export async function GET(
     }
 
     return NextResponse.json(item);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error fetching single item:", error);
-    if (error.message === "Authentication required.") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (errorMessage.includes("Authentication required.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to fetch item details." },
+      { message: errorMessage || "Failed to fetch item details." },
       { status: 500 }
     );
   }
@@ -95,24 +98,33 @@ export async function PATCH(
     });
 
     return NextResponse.json(updatedItem);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error updating item:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
     // Handle Prisma specific errors or general errors
-    if (error.code === "P2025") {
+    // Check if error is an object and has a 'code' property, and then check 'code'
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
       // Record to update not found
       return NextResponse.json(
         { message: "Item not found or you do not have permission to update." },
         { status: 404 }
       );
     }
-    if (error.message === "User not authenticated.") {
+    if (errorMessage.includes("Authentication required.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to update item." },
+      { message: errorMessage || "Failed to update item." },
       { status: 500 }
     );
   }
@@ -157,23 +169,32 @@ export async function DELETE(
       { message: "Item deleted successfully." },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error deleting item:", error);
-    if (error.code === "P2025") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    // Check if error is an object and has a 'code' property, and then check 'code'
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
       // Record to delete not found
       return NextResponse.json(
         { message: "Item not found or you do not have permission to delete." },
         { status: 404 }
       );
     }
-    if (error.message === "User not authenticated.") {
+    if (errorMessage.includes("User not authenticated.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to delete item." },
+      { message: errorMessage || "Failed to delete item." },
       { status: 500 }
     );
   }

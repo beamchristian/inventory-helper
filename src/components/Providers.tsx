@@ -1,39 +1,34 @@
 // src/components/Providers.tsx
-"use client"; // This directive marks this file as a Client Component
+"use client";
 
-import React from "react";
+import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { SessionProvider } from "next-auth/react"; // Import SessionProvider
+import React from "react";
+import { Session } from "next-auth"; // Import Session type
 
-// Create a new QueryClient instance outside the component
-// so it's not recreated on every render.
-// This instance will live on the client side.
-const queryClient = new QueryClient();
+// Create a client for React Query
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      refetchOnWindowFocus: false,
+      retry: 2,
+    },
+  },
+});
 
-/**
- * Providers Component
- * This client component wraps children with necessary providers like
- * QueryClientProvider and SessionProvider, ensuring they are initialized
- * on the client side.
- *
- * @param {object} props - Component props.
- * @param {React.ReactNode} props.children - The child components to be wrapped.
- * @param {any} props.session - The initial session object from NextAuth.js.
- */
 interface ProvidersProps {
   children: React.ReactNode;
-  session: any; // Type for session from NextAuth.js
+  session: Session | null | undefined; // NEW: Define session prop here
 }
 
-const Providers: React.FC<ProvidersProps> = ({ children, session }) => {
+export default function Providers({ children, session }: ProvidersProps) {
+  // NEW: Accept session prop
   return (
-    // SessionProvider makes the session available via useSession()
-    // It accepts an initial session object fetched from the server.
     <SessionProvider session={session}>
-      {/* QueryClientProvider makes react-query hooks available */}
+      {" "}
+      {/* Pass the session prop to NextAuth's SessionProvider */}
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </SessionProvider>
   );
-};
-
-export default Providers;
+}

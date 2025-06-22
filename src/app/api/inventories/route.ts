@@ -12,7 +12,7 @@ async function getUserIdFromSession() {
 }
 
 // GET all inventories for the authenticated user
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const userId = await getUserIdFromSession();
 
@@ -26,16 +26,19 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json(inventories);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error fetching user inventories:", error);
-    if (error.message === "User not authenticated.") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (errorMessage.includes("User not authenticated.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to fetch inventories." },
+      { message: errorMessage || "Failed to fetch inventories." },
       { status: 500 }
     );
   }
@@ -65,16 +68,19 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(newInventory, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error adding new inventory:", error);
-    if (error.message === "User not authenticated.") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (errorMessage.includes("User not authenticated.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to add inventory." },
+      { message: errorMessage || "Failed to add inventory." },
       { status: 500 }
     );
   }

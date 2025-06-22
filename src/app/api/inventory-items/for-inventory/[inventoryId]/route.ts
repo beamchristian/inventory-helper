@@ -58,33 +58,30 @@ export async function GET(
         inventory_id: inventoryId,
       },
       include: {
-        item: true, // Include the related Item data
+        item: true, // Include the related Item data (singular 'item')
       },
       orderBy: {
         created_at: "asc", // Or whatever default order you prefer
       },
     });
 
-    // Transform the response to match your client-side type (where `item` is `items`)
-    const formattedInventoryItems = inventoryItems.map((invItem) => ({
-      ...invItem,
-      items: invItem.item, // Renaming 'item' to 'items' for client-side compatibility
-      // Remove the original 'item' property if it causes type issues on client
-      // (though TypeScript `as any` might handle it, explicitly removing is cleaner)
-      item: undefined, // Explicitly set to undefined or delete if not needed
-    }));
-
-    return NextResponse.json(formattedInventoryItems);
-  } catch (error: any) {
+    // CRITICAL: We should return the data as Prisma gives it, with `item` (singular).
+    // Your client-side `CombinedInventoryItem` type (`InventoryItem & { item: Item }`)
+    // is already set up for this. No need to transform `item` to `items` here.
+    return NextResponse.json(inventoryItems);
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error fetching inventory items for inventory:", error);
-    if (error.message === "Authentication required.") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (errorMessage.includes("Authentication required.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to fetch inventory items." },
+      { message: errorMessage || "Failed to fetch inventory items." },
       { status: 500 }
     );
   }

@@ -39,16 +39,19 @@ export async function GET(
     }
 
     return NextResponse.json(inventory);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error fetching single inventory:", error);
-    if (error.message === "User not authenticated.") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (errorMessage.includes("User not authenticated.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to fetch inventory." },
+      { message: errorMessage || "Failed to fetch inventory." },
       { status: 500 }
     );
   }
@@ -91,22 +94,31 @@ export async function PATCH(
     });
 
     return NextResponse.json(updatedInventory);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error updating inventory:", error);
-    if (error.code === "P2025") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
+      // Specific Prisma error check
       return NextResponse.json(
         { message: "Inventory not found or you do not have permission." },
         { status: 404 }
       );
     }
-    if (error.message === "User not authenticated.") {
+    if (errorMessage.includes("User not authenticated.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to update inventory." },
+      { message: errorMessage || "Failed to update inventory." },
       { status: 500 }
     );
   }
@@ -150,22 +162,31 @@ export async function DELETE(
       { message: "Inventory deleted successfully." },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error deleting inventory:", error);
-    if (error.code === "P2025") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
+      // Specific Prisma error check
       return NextResponse.json(
         { message: "Inventory not found or you do not have permission." },
         { status: 404 }
       );
     }
-    if (error.message === "User not authenticated.") {
+    if (errorMessage.includes("User not authenticated.")) {
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to delete inventory." },
+      { message: errorMessage || "Failed to delete inventory." },
       { status: 500 }
     );
   }

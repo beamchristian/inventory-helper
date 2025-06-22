@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react"; // Import useSession
 import {
   useItems,
-  useAddItem,
+  useAddItem, // This is the hook for adding master items
   useUpdateItem,
   useDeleteItem,
 } from "../../hooks/useItems"; // Adjust path if necessary
@@ -49,11 +49,10 @@ type SortColumn =
   | "brand";
 
 export default function SettingsPage() {
-  const { data: session, status } = useSession(); // Get session and status
-  // No need for local userId state and useEffect to fetch it from Supabase
-
+  const { data: sessionData, status } = useSession(); // Fixed: Destructure as sessionData
+  console.log(sessionData);
   const { data: items, isLoading, isError, error } = useItems();
-  const addItemMutation = useAddItem();
+  const addItemMutation = useAddItem(); // This is for adding master items
   const updateItemMutation = useUpdateItem();
   const deleteItemMutation = useDeleteItem();
 
@@ -107,9 +106,8 @@ export default function SettingsPage() {
     setNewItemForm((prev) => {
       let updatedValue: string | number | null = value;
       if (type === "number") {
-        updatedValue = value === "" ? null : Number(value);
+        updatedValue = value === "" ? null : parseFloat(value);
       }
-      // If unit_type changes to quantity, reset average_weight_per_unit
       if (name === "unit_type" && value === "quantity") {
         return { ...prev, [name]: value, average_weight_per_unit: null };
       }
@@ -118,49 +116,55 @@ export default function SettingsPage() {
   };
 
   const handleAddItem = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission to handle validation client-side
+    e.preventDefault();
 
     if (status !== "authenticated") {
       showMessage("You must be logged in to add items.", "error");
       return;
     }
 
-    // --- Client-side validation ---
     if (!newItemForm.name.trim()) {
-      // Check if name is empty or just whitespace
       showMessage("Item Name is required.", "error");
       return;
     }
-    if (!newItemForm.unit_type) {
-      // Check if unit_type is selected
-      showMessage("Unit Type is required.", "error");
+    if (
+      !newItemForm.unit_type ||
+      (newItemForm.unit_type !== "quantity" &&
+        newItemForm.unit_type !== "weight")
+    ) {
+      showMessage(
+        "Unit Type is required and must be 'quantity' or 'weight'.",
+        "error"
+      );
       return;
     }
     if (
       newItemForm.unit_type === "weight" &&
       (newItemForm.average_weight_per_unit === null ||
+        isNaN(newItemForm.average_weight_per_unit) ||
         newItemForm.average_weight_per_unit <= 0)
     ) {
       showMessage(
-        "Average Weight Per Unit is required for 'Weight' items and must be greater than 0.",
+        "Average Weight Per Unit is required for 'Weight' items and must be a positive number.",
         "error"
       );
       return;
     }
-    // --- End client-side validation ---
 
     try {
-      // Ensure average_weight_per_unit is null if unit_type is 'quantity'
       const itemToSave = {
         ...newItemForm,
         average_weight_per_unit:
           newItemForm.unit_type === "quantity"
             ? null
-            : newItemForm.average_weight_per_unit,
+            : newItemForm.average_weight_per_unit !== null &&
+              !isNaN(newItemForm.average_weight_per_unit)
+            ? newItemForm.average_weight_per_unit
+            : null,
       };
+
       await addItemMutation.mutateAsync(itemToSave);
       setNewItemForm({
-        // Reset form to initial state
         name: "",
         upc_number: null,
         average_weight_per_unit: null,
@@ -170,7 +174,6 @@ export default function SettingsPage() {
       });
       showMessage("Item added successfully!", "success");
     } catch (err: unknown) {
-      // Explicitly type 'err' as unknown
       showMessage(
         `Error adding item: ${
           err instanceof Error ? err.message : "Unknown error"
@@ -189,9 +192,8 @@ export default function SettingsPage() {
       if (!prev) return null;
       let updatedValue: string | number | null = value;
       if (type === "number") {
-        updatedValue = value === "" ? null : Number(value);
+        updatedValue = value === "" ? null : parseFloat(value);
       }
-      // If unit_type changes to quantity, reset average_weight_per_unit
       if (name === "unit_type" && value === "quantity") {
         return { ...prev, [name]: value, average_weight_per_unit: null };
       }
@@ -207,42 +209,49 @@ export default function SettingsPage() {
       return;
     }
 
-    // --- Client-side validation for edit form ---
     if (!editingItem.name.trim()) {
       showMessage("Item Name is required.", "error");
       return;
     }
-    if (!editingItem.unit_type) {
-      showMessage("Unit Type is required.", "error");
+    if (
+      !editingItem.unit_type ||
+      (editingItem.unit_type !== "quantity" &&
+        editingItem.unit_type !== "weight")
+    ) {
+      showMessage(
+        "Unit Type is required and must be 'quantity' or 'weight'.",
+        "error"
+      );
       return;
     }
     if (
       editingItem.unit_type === "weight" &&
       (editingItem.average_weight_per_unit === null ||
+        isNaN(editingItem.average_weight_per_unit) ||
         editingItem.average_weight_per_unit <= 0)
     ) {
       showMessage(
-        "Average Weight Per Unit is required for 'Weight' items and must be greater than 0.",
+        "Average Weight Per Unit is required for 'Weight' items and must be a positive number.",
         "error"
       );
       return;
     }
-    // --- End client-side validation for edit form ---
 
     try {
-      // Ensure average_weight_per_unit is null if unit_type is 'quantity'
       const itemToUpdate = {
         ...editingItem,
         average_weight_per_unit:
           editingItem.unit_type === "quantity"
             ? null
-            : editingItem.average_weight_per_unit,
+            : editingItem.average_weight_per_unit !== null &&
+              !isNaN(editingItem.average_weight_per_unit)
+            ? editingItem.average_weight_per_unit
+            : null,
       };
-      await updateItemMutation.mutateAsync(itemToUpdate); // Pass the updated item with corrected weight
-      setEditingItem(null); // Exit edit mode
+      await updateItemMutation.mutateAsync(itemToUpdate);
+      setEditingItem(null);
       showMessage("Item updated successfully!", "success");
     } catch (err: unknown) {
-      // Explicitly type 'err' as unknown
       showMessage(
         `Error updating item: ${
           err instanceof Error ? err.message : "Unknown error"
@@ -257,7 +266,6 @@ export default function SettingsPage() {
       showMessage("You must be logged in to delete items.", "error");
       return;
     }
-    // Using window.confirm for now, but recommend replacing with custom modal
     if (
       window.confirm(
         "Are you sure you want to delete this item? This action cannot be undone."
@@ -267,7 +275,6 @@ export default function SettingsPage() {
         await deleteItemMutation.mutateAsync(itemId);
         showMessage("Item deleted successfully!", "success");
       } catch (err: unknown) {
-        // Explicitly type 'err' as unknown
         showMessage(
           `Error deleting item: ${
             err instanceof Error ? err.message : "Unknown error"
@@ -278,7 +285,6 @@ export default function SettingsPage() {
     }
   };
 
-  // Sorting logic
   const handleSort = (column: SortColumn) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
@@ -288,7 +294,6 @@ export default function SettingsPage() {
     }
   };
 
-  // Memoize sorted and paginated items to prevent unnecessary re-renders
   const paginatedItems = useMemo(() => {
     if (!items) return [];
 
@@ -298,7 +303,6 @@ export default function SettingsPage() {
       const aValue = a[sortColumn];
       const bValue = b[sortColumn];
 
-      // Handle null or undefined values gracefully
       if (aValue === null || aValue === undefined)
         return sortDirection === "asc" ? 1 : -1;
       if (bValue === null || bValue === undefined)
@@ -314,7 +318,6 @@ export default function SettingsPage() {
         return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
       }
 
-      // Fallback for other types or if types are mixed
       const valA = String(aValue);
       const valB = String(bValue);
       return sortDirection === "asc"
@@ -322,7 +325,6 @@ export default function SettingsPage() {
         : valB.localeCompare(valA);
     });
 
-    // Apply pagination
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return sortableItems.slice(startIndex, endIndex);
@@ -341,10 +343,9 @@ export default function SettingsPage() {
     e: React.ChangeEvent<HTMLSelectElement>
   ) => {
     setItemsPerPage(Number(e.target.value));
-    setCurrentPage(1); // Reset to first page when items per page changes
+    setCurrentPage(1);
   };
 
-  // Show loading spinner if session is loading or items are loading
   if (status === "loading" || isLoading) {
     return (
       <div className='min-h-screen flex items-center justify-center bg-background-base'>
@@ -353,7 +354,6 @@ export default function SettingsPage() {
     );
   }
 
-  // Show error message if not authenticated or other error occurs
   if (status === "unauthenticated" || isError) {
     return (
       <div className='min-h-screen flex items-center justify-center bg-background-base'>
@@ -364,7 +364,7 @@ export default function SettingsPage() {
               : `Error loading items: ${errorMessage}`}
           </p>
           <button
-            onClick={() => (window.location.href = "/auth/sign-in")} // Hard redirect to login page
+            onClick={() => (window.location.href = "/auth/sign-in")}
             className='mt-4 bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded'
           >
             Go to Sign In
@@ -376,7 +376,6 @@ export default function SettingsPage() {
 
   return (
     <div className='container mx-auto p-4 max-w-4xl'>
-      {/* Custom Message Box for alerts */}
       <div
         id='settingsMessageBox'
         className='fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50 hidden'
@@ -386,7 +385,6 @@ export default function SettingsPage() {
         Manage Inventory Items
       </h1>
 
-      {/* Add New Item Form */}
       <div className='bg-background-surface p-6 rounded-lg shadow-md mb-8 border border-border-base'>
         <h2 className='text-2xl font-semibold mb-4 text-foreground'>
           Add New Item
@@ -395,7 +393,6 @@ export default function SettingsPage() {
           onSubmit={handleAddItem}
           className='grid grid-cols-1 md:grid-cols-2 gap-4'
         >
-          {/* Name */}
           <div>
             <label
               htmlFor='newName'
@@ -413,7 +410,6 @@ export default function SettingsPage() {
               className='shadow appearance-none border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
             />
           </div>
-          {/* UPC Number */}
           <div>
             <label
               htmlFor='newUpc'
@@ -430,7 +426,6 @@ export default function SettingsPage() {
               className='shadow appearance-none border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
             />
           </div>
-          {/* Unit Type (Quantity/Weight) */}
           <div>
             <label
               htmlFor='newUnitType'
@@ -450,7 +445,6 @@ export default function SettingsPage() {
               <option value='weight'>Weight (lbs)</option>
             </select>
           </div>
-          {/* Average Weight Per Unit (conditionally rendered) */}
           {newItemForm.unit_type === "weight" && (
             <div>
               <label
@@ -471,7 +465,6 @@ export default function SettingsPage() {
               />
             </div>
           )}
-          {/* Item Type */}
           <div>
             <label
               htmlFor='newItemType'
@@ -488,7 +481,6 @@ export default function SettingsPage() {
               className='shadow appearance-none border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
             />
           </div>
-          {/* Brand */}
           <div>
             <label
               htmlFor='newBrand'
@@ -505,7 +497,6 @@ export default function SettingsPage() {
               className='shadow appearance-none border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
             />
           </div>
-          {/* Submit Button */}
           <div className='md:col-span-2 text-right'>
             <button
               type='submit'
@@ -518,7 +509,6 @@ export default function SettingsPage() {
         </form>
       </div>
 
-      {/* Item List */}
       <div className='bg-background-surface p-6 rounded-lg shadow-md border border-border-base'>
         <h2 className='text-2xl font-semibold mb-4 text-foreground'>
           Your Inventory Items
@@ -595,11 +585,10 @@ export default function SettingsPage() {
                   {paginatedItems.map((item) => (
                     <React.Fragment key={item.id}>
                       {editingItem && editingItem.id === item.id ? (
-                        // Edit Form Row
-                        <tr>
+                        <tr className='bg-background-base'>
                           <td
                             colSpan={7}
-                            className='p-4 border-b border-border-base bg-background-base'
+                            className='p-4 border-b border-border-base'
                           >
                             <form
                               onSubmit={handleUpdateItem}
@@ -684,7 +673,6 @@ export default function SettingsPage() {
                           </td>
                         </tr>
                       ) : (
-                        // Display Row
                         <tr className='hover:bg-background-base'>
                           <td className='py-2 px-4 border-b border-border-base text-foreground'>
                             {item.name}
@@ -731,7 +719,6 @@ export default function SettingsPage() {
               </table>
             </div>
 
-            {/* Pagination Controls */}
             <div className='flex justify-between items-center mt-4'>
               <div>
                 <label htmlFor='itemsPerPage' className='text-text-base mr-2'>

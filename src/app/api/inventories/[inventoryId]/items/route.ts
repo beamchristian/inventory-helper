@@ -65,16 +65,20 @@ export async function GET(
     });
 
     return NextResponse.json(inventoryItems, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error fetching inventory items:", error);
-    if (error.message === "Authentication required.") {
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    if (errorMessage.includes("Authentication required.")) {
+      // Keep explicit check for auth error message
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: error.message || "Failed to fetch inventory items." },
+      { message: errorMessage || "Failed to fetch inventory items." },
       { status: 500 }
     );
   }
@@ -83,12 +87,6 @@ export async function GET(
 /**
  * Handles POST requests to add an existing Item to a specific Inventory.
  * This creates a new InventoryItem record.
- *
- * Expected Request Body:
- * {
- * item_id: string; // The ID of the existing master item
- * counted_units: number; // Initial count (e.g., 0)
- * }
  *
  * @param {Request} req - The incoming request object.
  * @param {object} params - Next.js dynamic route parameters.
@@ -160,10 +158,16 @@ export async function POST(
     });
 
     return NextResponse.json(newInventoryItem, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error adding item to inventory:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json(
-      { message: "Failed to add item to inventory", error: error.message },
+      {
+        message: errorMessage || "Failed to add item to inventory",
+        error: errorMessage,
+      }, // Include errorMessage in the response
       { status: 500 }
     );
   }
@@ -242,10 +246,16 @@ export async function DELETE(
       { message: "Item successfully removed from inventory." },
       { status: 200 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error deleting inventory item:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json(
-      { message: "Failed to remove item from inventory", error: error.message },
+      {
+        message: errorMessage || "Failed to remove item from inventory",
+        error: errorMessage,
+      },
       { status: 500 }
     );
   }

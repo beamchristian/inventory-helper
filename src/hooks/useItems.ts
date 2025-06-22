@@ -103,7 +103,7 @@ export const useUpdateItem = () => {
       });
       return handleApiResponse(response);
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       // Update the cache for the specific item, and invalidate the list
       queryClient.invalidateQueries({ queryKey: ["items"] });
       // Optionally, you can update the specific item in the cache if you need

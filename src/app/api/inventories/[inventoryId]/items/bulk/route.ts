@@ -107,23 +107,23 @@ export async function POST(
     }));
 
     // 6. Bulk create new InventoryItem records
-    // `createMany` is highly efficient for inserting multiple records.
-    // `skipDuplicates: true` is crucial here to prevent errors if, by chance,
-    // an item was added by another process between our existence check and the createMany call.
     const result = await prisma.inventoryItem.createMany({
       data: dataToCreate,
-      skipDuplicates: true, // Prevents errors if a unique constraint is violated
+      skipDuplicates: true,
     });
 
-    // `result.count` will tell us how many records were actually created.
     return NextResponse.json(
       { message: "Items added successfully.", countAdded: result.count },
       { status: 201 }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Changed 'any' to 'unknown'
     console.error("Error adding all items to inventory:", error);
+    // Safely access error.message
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json(
-      { message: error.message || "Failed to add all items to inventory." },
+      { message: errorMessage || "Failed to add all items to inventory." },
       { status: 500 }
     );
   }

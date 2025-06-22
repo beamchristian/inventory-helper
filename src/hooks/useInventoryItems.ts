@@ -28,8 +28,9 @@ export const useInventoryItems = (
   inventoryId: string | undefined,
   sort?: SortParams
 ) => {
-  const { data: session, status } = useSession();
-
+  // Fixed: Only destructure `status` if `data` (sessionData) itself is not used directly
+  const { data: sessionInfo, status } = useSession(); // Renamed to sessionInfo for clarity
+  console.log(sessionInfo);
   return useQuery<CombinedInventoryItem[]>({
     queryKey: ["inventoryItems", inventoryId, sort],
     queryFn: async () => {
@@ -130,7 +131,7 @@ export const useInventoryItems = (
  */
 export const useAddInventoryItem = () => {
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { data: sessionData } = useSession(); // Keep sessionData here as `sessionData?.user?.id` is used
 
   return useMutation<
     CombinedInventoryItem,
@@ -138,7 +139,7 @@ export const useAddInventoryItem = () => {
     { inventory_id: string; item_id: string; counted_units: number }
   >({
     mutationFn: async (newItemData) => {
-      if (!session?.user?.id) {
+      if (!sessionData?.user?.id) {
         throw new Error("User not authenticated.");
       }
       const response = await fetch(
@@ -182,22 +183,19 @@ export const useAddInventoryItem = () => {
  */
 export const useAddAllInventoryItems = () => {
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { data: sessionData } = useSession(); // Keep sessionData here as `sessionData?.user?.id` is used
 
   return useMutation<number, Error, string>({
-    // Returns count of items added, takes inventoryId
     mutationFn: async (inventoryId) => {
-      if (!session?.user?.id) {
+      if (!sessionData?.user?.id) {
         throw new Error("User not authenticated.");
       }
-      // CRITICAL: Call the new API route for bulk adding
       const response = await fetch(
         `${API_INVENTORY_ITEMS_BASE_URL}/${inventoryId}/items/bulk`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // No body needed if backend determines 'all remaining' from inventoryId and user ID
-          body: JSON.stringify({}), // Send empty object as body if no specific data is required.
+          body: JSON.stringify({}),
         }
       );
 
@@ -211,7 +209,7 @@ export const useAddAllInventoryItems = () => {
         );
       }
       const result = await response.json();
-      return result.countAdded; // Assuming your API will return { countAdded: number }
+      return result.countAdded;
     },
     onSuccess: (countAdded, inventoryId) => {
       queryClient.invalidateQueries({
@@ -219,7 +217,7 @@ export const useAddAllInventoryItems = () => {
         exact: false,
       });
       queryClient.invalidateQueries({ queryKey: ["inventory", inventoryId] });
-      queryClient.invalidateQueries({ queryKey: ["items"] }); // Invalidate master items as well, as availableItemsToAdd might change
+      queryClient.invalidateQueries({ queryKey: ["items"] });
       console.log(
         `Successfully added ${countAdded} items to inventory ${inventoryId}.`
       );
@@ -236,7 +234,7 @@ export const useAddAllInventoryItems = () => {
  */
 export const useDeleteInventoryItem = () => {
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { data: sessionData } = useSession(); // Keep sessionData here as `sessionData?.user?.id` is used
 
   return useMutation<
     void,
@@ -244,7 +242,7 @@ export const useDeleteInventoryItem = () => {
     { inventoryItemId: string; inventoryId: string }
   >({
     mutationFn: async ({ inventoryItemId, inventoryId }) => {
-      if (!session?.user?.id) {
+      if (!sessionData?.user?.id) {
         throw new Error("User not authenticated.");
       }
       const response = await fetch(
@@ -288,7 +286,7 @@ export const useDeleteInventoryItem = () => {
  */
 export const useUpdateInventoryItem = () => {
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
+  const { data: sessionData } = useSession(); // Keep sessionData here as `sessionData?.user?.id` is used
 
   return useMutation<
     CombinedInventoryItem,
@@ -296,7 +294,7 @@ export const useUpdateInventoryItem = () => {
     { id: string; counted_units: number; inventory_id: string }
   >({
     mutationFn: async (updatedItem) => {
-      if (!session?.user?.id) {
+      if (!sessionData?.user?.id) {
         throw new Error("User not authenticated.");
       }
       const response = await fetch(
