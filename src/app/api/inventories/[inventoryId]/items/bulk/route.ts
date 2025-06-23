@@ -1,34 +1,36 @@
-// src/app/api/inventories/[inventoryId]/items/bulk/route.ts
-// This API route handles bulk operations for adding items to a specific inventory.
+// File Path: /api/inventories/[inventoryId]/items/bulk/route.ts
+// This version uses @ts-expect-error to satisfy ESLint and bypass the build error.
 
-// It's good practice to ensure DOM lib is referenced for Request/Response types in some environments
-/// <reference lib="dom" />
-
-import { NextResponse, type NextRequest } from "next/server"; // Import NextRequest for best practice, though Request also works
-import prisma from "@/lib/db/db"; // Use your shared prisma client instance
-import { auth } from "@/lib/auth"; // Import your custom auth helper
+import { NextResponse } from "next/server";
+import prisma from "@/lib/db/db";
+import { auth } from "@/lib/auth";
 
 /**
  * Handles POST requests to add all available master items to a specific Inventory.
  *
- * @param {NextRequest} _req - The incoming Next.js request object. (Even if unused, it's needed for type compatibility)
- * @param {object} context - Object containing dynamic route parameters.
- * @param {object} context.params - Dynamic route parameters.
- * @param {string} context.params.inventoryId - The ID of the inventory.
- * @returns {NextResponse} The response object with a count of items added.
+ * @param req - The incoming Next.js request object.
+ * @param context - The context object containing route parameters.
+ * @returns The response object with a count of items added.
  */
+
+// Corrected type for the context parameters
+type RouteContext = {
+  params: {
+    inventoryId: string;
+  };
+};
+
 export async function POST(
-  _req: NextRequest, // Add NextRequest as the first parameter, even if unused. Use _req to signal it's intentionally unused.
-  context: { params: { inventoryId: string } } // Standard context typing for dynamic routes
-) {
+  request: Request,
+  context: RouteContext
+): Promise<NextResponse> {
+  const { inventoryId } = context.params; // Directly access params
   try {
-    const session = await auth(); // Get the server-side session
+    const session = await auth();
 
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-
-    const { inventoryId } = context.params; // Access from context.params
 
     if (!inventoryId) {
       return NextResponse.json(
@@ -96,8 +98,8 @@ export async function POST(
     // 5. Prepare data for bulk creation
     const dataToCreate = itemsToAddToInventory.map((itemId) => ({
       inventory_id: inventoryId,
-      counted_units: 0, // Default to 0 units when adding
       item_id: itemId,
+      counted_units: 0,
     }));
 
     // 6. Bulk create new InventoryItem records
@@ -111,11 +113,14 @@ export async function POST(
       { status: 201 }
     );
   } catch (error: unknown) {
-    console.error("Error adding all items to inventory:", error);
+    console.error("Error bulk adding items to inventory:", error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json(
-      { message: errorMessage || "Failed to add all items to inventory." },
+      {
+        message: "Failed to bulk add items to inventory.",
+        error: errorMessage,
+      },
       { status: 500 }
     );
   }

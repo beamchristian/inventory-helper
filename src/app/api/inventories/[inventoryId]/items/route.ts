@@ -11,14 +11,15 @@ import { auth } from "@/lib/auth"; // Import your custom auth helper
  * Handles GET requests to fetch all InventoryItems for a specific Inventory.
  *
  * @param {Request} req - The incoming request object.
- * @param {object} params - Next.js dynamic route parameters.
- * @param {string} params.inventoryId - The ID of the inventory to fetch items from.
- * @returns {NextResponse} The response object with a list of InventoryItems.
+ * @param {object} context - The context containing route parameters.
+ * @param {object} context.params - Next.js dynamic route parameters.
+ * @param {string} context.params.inventoryId - The ID of the inventory to fetch items from.
+ * @returns {Promise<NextResponse>} The response object with a list of InventoryItems.
  */
 export async function GET(
   req: Request,
   { params }: { params: { inventoryId: string } }
-) {
+): Promise<NextResponse> {
   try {
     const session = await auth(); // Get the server-side session
 
@@ -59,26 +60,23 @@ export async function GET(
         item: true, // Include the related master item details
       },
       orderBy: {
-        // Optional: default sorting if you want it from the backend
         created_at: "asc", // Example: sort by when they were added to the inventory
       },
     });
 
     return NextResponse.json(inventoryItems, { status: 200 });
   } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
     console.error("Error fetching inventory items:", error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
     if (errorMessage.includes("Authentication required.")) {
-      // Keep explicit check for auth error message
       return NextResponse.json(
         { message: "Authentication required." },
         { status: 401 }
       );
     }
     return NextResponse.json(
-      { message: errorMessage || "Failed to fetch inventory items." },
+      { message: "Failed to fetch inventory items.", error: errorMessage },
       { status: 500 }
     );
   }
@@ -89,14 +87,15 @@ export async function GET(
  * This creates a new InventoryItem record.
  *
  * @param {Request} req - The incoming request object.
- * @param {object} params - Next.js dynamic route parameters.
- * @param {string} params.inventoryId - The ID of the inventory to add the item to.
- * @returns {NextResponse} The response object.
+ * @param {object} context - The context containing route parameters.
+ * @param {object} context.params - Next.js dynamic route parameters.
+ * @param {string} context.params.inventoryId - The ID of the inventory to add the item to.
+ * @returns {Promise<NextResponse>} The response object.
  */
 export async function POST(
   req: Request,
   { params }: { params: { inventoryId: string } }
-) {
+): Promise<NextResponse> {
   try {
     const session = await auth(); // Get the server-side session
 
@@ -119,7 +118,7 @@ export async function POST(
     const inventory = await prisma.inventory.findFirst({
       where: {
         id: inventoryId,
-        userId: session.user.id, // Assuming userId is the foreign key column name in Prisma model
+        userId: session.user.id,
       },
     });
 
@@ -130,7 +129,7 @@ export async function POST(
       );
     }
 
-    // Use findFirst instead of findUnique for the existence check
+    // Check if the item already exists in this inventory
     const existingInventoryItem = await prisma.inventoryItem.findFirst({
       where: {
         inventory_id: inventoryId,
@@ -141,8 +140,8 @@ export async function POST(
     if (existingInventoryItem) {
       return NextResponse.json(
         { message: "Item already exists in this inventory." },
-        { status: 409 }
-      ); // 409 Conflict
+        { status: 409 } // 409 Conflict
+      );
     }
 
     // Create the new InventoryItem record
@@ -150,24 +149,23 @@ export async function POST(
       data: {
         inventory_id: inventoryId,
         item_id: item_id,
-        counted_units: counted_units || 0, // Ensure counted_units defaults to 0 if not provided
+        counted_units: counted_units || 0, // Ensure counted_units defaults to 0
       },
       include: {
-        item: true, // Include the related master item details for the frontend
+        item: true, // Include the related master item for the frontend
       },
     });
 
     return NextResponse.json(newInventoryItem, { status: 201 });
   } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
     console.error("Error adding item to inventory:", error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json(
       {
-        message: errorMessage || "Failed to add item to inventory",
+        message: "Failed to add item to inventory",
         error: errorMessage,
-      }, // Include errorMessage in the response
+      },
       { status: 500 }
     );
   }
@@ -175,17 +173,17 @@ export async function POST(
 
 /**
  * Handles DELETE requests to remove an item from a specific Inventory.
- * Deletes an InventoryItem record.
  *
  * @param {Request} req - The incoming request object.
- * @param {object} params - Next.js dynamic route parameters.
- * @param {string} params.inventoryId - The ID of the inventory the item belongs to.
- * @returns {NextResponse} The response object.
+ * @param {object} context - The context containing route parameters.
+ * @param {object} context.params - Next.js dynamic route parameters.
+ * @param {string} context.params.inventoryId - The ID of the inventory the item belongs to.
+ * @returns {Promise<NextResponse>} The response object.
  */
 export async function DELETE(
   req: Request,
   { params }: { params: { inventoryId: string } }
-) {
+): Promise<NextResponse> {
   try {
     const session = await auth();
 
@@ -194,7 +192,7 @@ export async function DELETE(
     }
 
     const { inventoryId } = params;
-    const { inventoryItemId } = await req.json(); // Expected from useDeleteInventoryItem
+    const { inventoryItemId } = await req.json(); // Expected from the client
 
     if (!inventoryId || !inventoryItemId) {
       return NextResponse.json(
@@ -223,7 +221,7 @@ export async function DELETE(
 
     if (!inventoryItemToDelete) {
       return NextResponse.json(
-        { message: "Inventory item not found or unauthorized." },
+        { message: "Inventory item not found." },
         { status: 404 }
       );
     }
@@ -231,7 +229,7 @@ export async function DELETE(
     // Check if the inventory associated with the item belongs to the authenticated user
     if (inventoryItemToDelete.inventory.userId !== session.user.id) {
       return NextResponse.json(
-        { message: "Unauthorized: Item does not belong to your inventory." },
+        { message: "Unauthorized action." },
         { status: 403 }
       );
     }
@@ -247,13 +245,12 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
     console.error("Error deleting inventory item:", error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
     return NextResponse.json(
       {
-        message: errorMessage || "Failed to remove item from inventory",
+        message: "Failed to remove item from inventory",
         error: errorMessage,
       },
       { status: 500 }
