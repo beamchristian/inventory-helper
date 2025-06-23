@@ -1,7 +1,7 @@
 // src/app/inventories/[inventoryId]/items/[itemId]/page.tsx
 "use client";
 
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { InventoryItem, Item } from "@/types"; // Ensure correct path for your types
