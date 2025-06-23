@@ -1,7 +1,7 @@
 // File Path: /api/inventories/[inventoryId]/items/bulk/route.ts
 // This version uses @ts-expect-error to satisfy ESLint and bypass the build error.
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db/db";
 import { auth } from "@/lib/auth";
 
@@ -12,25 +12,18 @@ import { auth } from "@/lib/auth";
  * @param context - The context object containing route parameters.
  * @returns The response object with a count of items added.
  */
-
-// Corrected type for the context parameters
-type RouteContext = {
-  params: {
-    inventoryId: string;
-  };
-};
-
 export async function POST(
-  request: Request,
-  context: RouteContext
+  req: NextRequest,
+  { params }: { params: { inventoryId: string } }
 ): Promise<NextResponse> {
-  const { inventoryId } = context.params; // Directly access params
   try {
     const session = await auth();
 
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+
+    const { inventoryId } = params;
 
     if (!inventoryId) {
       return NextResponse.json(
