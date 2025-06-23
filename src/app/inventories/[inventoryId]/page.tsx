@@ -511,8 +511,13 @@ export default function InventoryDetailPage() {
       status === "unauthenticated" ||
       errorMessage.includes("Authentication required.")
     ) {
-      router.push("/auth/sign-in");
-      return null;
+      // The useEffect will handle the redirect.
+      // We can show the main loading spinner while we wait for the redirect.
+      return (
+        <div className='min-h-screen flex items-center justify-center bg-background-base'>
+          <LoadingSpinner />
+        </div>
+      );
     }
 
     const isNotFound = errorMessage?.includes("not found");

@@ -1,17 +1,37 @@
 // src/app/api/items/[itemId]/route.ts
-// This API route handles GET, PATCH, and DELETE operations for a single Item.
-
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db"; // Your Prisma client instance
-import { auth } from "@/lib/auth"; // Your NextAuth.js server-side auth helper
+import prisma from "@/lib/db/db";
+import { auth } from "@/lib/auth";
 
-// Helper to get userId securely on the server
-async function getUserIdFromSession() {
-  const session = await auth();
-  if (!session || !session.user || !session.user.id) {
-    throw new Error("Authentication required.");
+// REFACTORED: Centralized error handler to reduce repetition.
+function handleError(error: unknown): NextResponse {
+  console.error("API Error:", error);
+  if (error instanceof Error) {
+    if (error.message.includes("Authentication required")) {
+      return NextResponse.json(
+        { message: "Authentication required." },
+        { status: 401 }
+      );
+    }
   }
-  return session.user.id;
+  // Handle Prisma's "Record Not Found" error for delete/update operations
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "P2025"
+  ) {
+    return NextResponse.json(
+      { message: "Item not found or you do not have permission." },
+      { status: 404 }
+    );
+  }
+  const errorMessage =
+    error instanceof Error ? error.message : "An unknown error occurred.";
+  return NextResponse.json(
+    { message: "An internal error occurred.", error: errorMessage },
+    { status: 500 }
+  );
 }
 
 // GET handler to fetch a single Item by ID
@@ -20,43 +40,29 @@ export async function GET(
   { params }: { params: { itemId: string } }
 ) {
   try {
-    const userId = await getUserIdFromSession();
-    const itemId = params.itemId;
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Authentication required");
+    }
+    const userId = session.user.id;
 
+    // REFACTORED: Use a single query to find the item ONLY if it belongs to the user.
     const item = await prisma.item.findUnique({
       where: {
-        id: itemId,
+        id: params.itemId,
+        user_id: userId, // Combine the ownership check into the query
       },
     });
 
+    // If no item is found, it's either non-existent or not owned by the user.
+    // Return 404 in both cases for better security.
     if (!item) {
       return NextResponse.json({ message: "Item not found." }, { status: 404 });
     }
 
-    // Crucial: Ensure the item belongs to the authenticated user
-    if (item.user_id !== userId) {
-      return NextResponse.json(
-        { message: "Unauthorized access to this item." },
-        { status: 403 }
-      );
-    }
-
     return NextResponse.json(item);
-  } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
-    console.error("Error fetching single item:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    if (errorMessage.includes("Authentication required.")) {
-      return NextResponse.json(
-        { message: "Authentication required." },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json(
-      { message: errorMessage || "Failed to fetch item details." },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }
 
@@ -66,67 +72,27 @@ export async function PATCH(
   { params }: { params: { itemId: string } }
 ) {
   try {
-    const userId = await getUserIdFromSession();
-    const itemId = params.itemId;
-    const body = await request.json(); // Data to update
-
-    // Ensure the item belongs to the authenticated user before updating
-    const existingItem = await prisma.item.findUnique({
-      where: { id: itemId },
-    });
-
-    if (!existingItem) {
-      return NextResponse.json(
-        { message: "Item not found for update." },
-        { status: 404 }
-      );
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Authentication required");
     }
+    const userId = session.user.id;
+    const body = await request.json();
 
-    if (existingItem.user_id !== userId) {
-      return NextResponse.json(
-        { message: "Unauthorized: You do not own this item." },
-        { status: 403 }
-      );
-    }
-
+    // REFACTORED: Use a single 'update' call. Prisma will fail with a P2025 error
+    // if the 'where' clause doesn't find a matching record (i.e., wrong ID or wrong user).
+    // This eliminates the need for a separate 'findUnique' call first.
     const updatedItem = await prisma.item.update({
       where: {
-        id: itemId,
-        user_id: userId, // Add userId to where clause for extra security
+        id: params.itemId,
+        user_id: userId, // Enforce ownership
       },
-      data: body, // Apply updates from the request body
+      data: body,
     });
 
     return NextResponse.json(updatedItem);
-  } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
-    console.error("Error updating item:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    // Handle Prisma specific errors or general errors
-    // Check if error is an object and has a 'code' property, and then check 'code'
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "P2025"
-    ) {
-      // Record to update not found
-      return NextResponse.json(
-        { message: "Item not found or you do not have permission to update." },
-        { status: 404 }
-      );
-    }
-    if (errorMessage.includes("Authentication required.")) {
-      return NextResponse.json(
-        { message: "Authentication required." },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json(
-      { message: errorMessage || "Failed to update item." },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }
 
@@ -136,32 +102,18 @@ export async function DELETE(
   { params }: { params: { itemId: string } }
 ) {
   try {
-    const userId = await getUserIdFromSession();
-    const itemId = params.itemId;
-
-    // Ensure the item belongs to the authenticated user before deleting
-    const existingItem = await prisma.item.findUnique({
-      where: { id: itemId },
-    });
-
-    if (!existingItem) {
-      return NextResponse.json(
-        { message: "Item not found for deletion." },
-        { status: 404 }
-      );
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Authentication required");
     }
+    const userId = session.user.id;
 
-    if (existingItem.user_id !== userId) {
-      return NextResponse.json(
-        { message: "Unauthorized: You do not own this item." },
-        { status: 403 }
-      );
-    }
-
+    // REFACTORED: Use a single 'delete' call. Like 'update', this is an atomic
+    // operation that checks ownership and deletes in one step.
     await prisma.item.delete({
       where: {
-        id: itemId,
-        user_id: userId, // Add userId to where clause for extra security
+        id: params.itemId,
+        user_id: userId, // Enforce ownership
       },
     });
 
@@ -169,33 +121,7 @@ export async function DELETE(
       { message: "Item deleted successfully." },
       { status: 200 }
     );
-  } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
-    console.error("Error deleting item:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    // Check if error is an object and has a 'code' property, and then check 'code'
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "P2025"
-    ) {
-      // Record to delete not found
-      return NextResponse.json(
-        { message: "Item not found or you do not have permission to delete." },
-        { status: 404 }
-      );
-    }
-    if (errorMessage.includes("User not authenticated.")) {
-      return NextResponse.json(
-        { message: "Authentication required." },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json(
-      { message: errorMessage || "Failed to delete item." },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }

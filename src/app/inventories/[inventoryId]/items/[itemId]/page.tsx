@@ -1,35 +1,33 @@
 // src/app/inventories/[inventoryId]/items/[itemId]/page.tsx
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { InventoryItem, Item } from "@/types"; // Ensure correct path for your types
 import {
   useInventoryItems,
   useUpdateInventoryItem,
-} from "@/hooks/useInventoryItems"; // Adjusted path for clarity
-
-// Import the reusable sort function we created
+} from "@/hooks/useInventoryItems";
 import { sortForCountMode, sortForItemTypeOnly } from "@/lib/utils";
 
-// REMOVE ANY DIRECT SUPABASE IMPORTS LIKE THESE:
-// import { supabase } from '@supabase/supabase-js';
-// import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'; // Or similar
-
 /**
- * useInventoryItemDetails Hook
- * Fetches details for a specific inventory item, including its associated master item data.
- * IMPORTANT: This hook now fetches data from your API route, not directly from Supabase.
+ * FIXED: useInventoryItemDetails Hook
  */
-const useInventoryItemDetails = (itemId: string | undefined) => {
-  return useQuery<InventoryItem & { items: Item }>({
+const useInventoryItemDetails = (
+  inventoryId: string,
+  itemId: string | undefined
+) => {
+  // CORRECTED: Type now uses 'item' (singular)
+  return useQuery<InventoryItem & { item: Item }>({
     queryKey: ["inventoryItem", itemId],
     queryFn: async () => {
-      if (!itemId) throw new Error("Inventory Item ID is missing.");
+      if (!itemId || !inventoryId) throw new Error("ID is missing.");
 
-      // --- CRUCIAL CHANGE: Use fetch to call your API route ---
-      const response = await fetch(`/api/inventory-items/${itemId}`);
+      // CORRECTED: Use the full, correct API route path
+      const response = await fetch(
+        `/api/inventories/${inventoryId}/items/${itemId}`
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -38,26 +36,23 @@ const useInventoryItemDetails = (itemId: string | undefined) => {
         );
       }
 
-      const data: InventoryItem & { items: Item } = await response.json();
-      return data;
+      // The API returns an object with a nested 'item' property
+      return response.json();
     },
-    enabled: !!itemId,
+    enabled: !!itemId && !!inventoryId,
   });
 };
 
 /**
  * InventoryItemDetailPage Component
- * Renders the detailed view for a single inventory item, allows editing its count,
- * and provides navigation to the next/previous item in the inventory.
  */
 export default function InventoryItemDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const searchParams = useSearchParams(); // Get access to search params
+  const searchParams = useSearchParams();
 
   const inventoryId = params.inventoryId as string;
   const itemId = params.itemId as string;
-
   const sortMode = searchParams.get("sortMode") || "default";
 
   const queryClient = useQueryClient();
@@ -67,39 +62,33 @@ export default function InventoryItemDetailPage() {
     isLoading: isInventoryItemLoading,
     isError: isInventoryItemError,
     error: inventoryItemError,
-  } = useInventoryItemDetails(itemId);
+  } = useInventoryItemDetails(inventoryId, itemId); // Pass both IDs
 
-  // 2. Fetch the RAW, unsorted list of items
   const {
-    data: rawInventoryItems, // Renamed to indicate it's unsorted
+    data: rawInventoryItems,
     isLoading: areAllItemsLoading,
     isError: areAllItemsError,
     error: allItemsError,
   } = useInventoryItems(inventoryId);
 
-  // 3. Conditionally sort the list based on the sortMode from the URL
   const allInventoryItems = useMemo(() => {
     if (!rawInventoryItems) return [];
-
+    // The sort functions expect 'item' (singular), which is correct now.
     switch (sortMode) {
       case "itemType":
-        console.log("Sorting by: Item Type Only");
         return sortForItemTypeOnly(rawInventoryItems);
       case "default":
       default:
-        console.log("Sorting by: Default (Type -> Brand -> Name)");
         return sortForCountMode(rawInventoryItems);
     }
   }, [rawInventoryItems, sortMode]);
 
   const updateInventoryItemMutation = useUpdateInventoryItem();
-
-  // State for the value entered into the input field
   const [inputValue, setInputValue] = useState<string>("");
 
-  // Helper function to update the count
   const performUpdate = useCallback(
     async (newCount: number) => {
+      // ✅ SAFETY CHECK: Ensure data exists before using it
       if (!inventoryItem?.id || !inventoryItem.inventory_id) return;
 
       if (newCount < 0) {
@@ -107,12 +96,13 @@ export default function InventoryItemDetailPage() {
         return;
       }
 
+      // ✅ SAFETY CHECK: Access nested property safely
       if (
-        inventoryItem.items.unit_type === "quantity" &&
+        inventoryItem.item?.unit_type === "quantity" &&
         !Number.isInteger(newCount)
       ) {
         alert("Quantity items must have whole number counts.");
-        newCount = Math.floor(newCount); // Force it to be an integer
+        newCount = Math.floor(newCount);
       }
 
       try {
@@ -125,7 +115,7 @@ export default function InventoryItemDetailPage() {
         queryClient.invalidateQueries({
           queryKey: ["inventoryItems", inventoryId],
         });
-        setInputValue(""); // Clear input after successful update
+        setInputValue("");
       } catch (err) {
         alert(
           `Error updating count: ${
@@ -142,6 +132,8 @@ export default function InventoryItemDetailPage() {
       inventoryId,
     ]
   );
+
+  // ... (the rest of the component handlers like handleOperation, navigateToItem, etc. can remain the same)
 
   const handleOperation = (operation: "add" | "subtract" | "replace") => {
     const value = parseFloat(inputValue);
@@ -171,7 +163,6 @@ export default function InventoryItemDetailPage() {
     performUpdate(newCount);
   };
 
-  // This logic now works on the newly sorted `allInventoryItems` array
   const currentIndex = allInventoryItems?.findIndex(
     (item) => item.id === itemId
   );
@@ -180,7 +171,10 @@ export default function InventoryItemDetailPage() {
   const navigateToItem = (index: number) => {
     if (allInventoryItems && index >= 0 && index < totalItems) {
       const nextOrPrevItem = allInventoryItems[index];
-      router.push(`/inventories/${inventoryId}/items/${nextOrPrevItem.id}`);
+      // Pass the sortMode in the URL to maintain sort order during navigation
+      router.push(
+        `/inventories/${inventoryId}/items/${nextOrPrevItem.id}?sortMode=${sortMode}`
+      );
     }
   };
 
@@ -196,10 +190,6 @@ export default function InventoryItemDetailPage() {
     }
   };
 
-  const isFirstItem = currentIndex === 0;
-  const isLastItem = currentIndex === totalItems - 1;
-  const isUpdating = updateInventoryItemMutation.isPending;
-
   if (isInventoryItemLoading || areAllItemsLoading) {
     return (
       <div className='flex justify-center items-center h-screen bg-background-base'>
@@ -208,42 +198,36 @@ export default function InventoryItemDetailPage() {
     );
   }
 
-  if (isInventoryItemError) {
+  if (isInventoryItemError || areAllItemsError || !inventoryItem) {
+    const errorMsg =
+      inventoryItemError?.message ||
+      allItemsError?.message ||
+      "Inventory item not found.";
     return (
       <div className='text-error text-center mt-8 bg-background-base p-4 rounded-lg'>
-        Error loading item: {inventoryItemError?.message}
+        Error: {errorMsg}
       </div>
     );
   }
 
-  if (areAllItemsError) {
-    return (
-      <div className='text-error text-center mt-8 bg-background-base p-4 rounded-lg'>
-        Error loading inventory items list: {allItemsError?.message}
-      </div>
-    );
-  }
-
-  if (!inventoryItem) {
-    return (
-      <div className='text-center mt-8 text-text-muted bg-background-base p-4 rounded-lg'>
-        Inventory item not found.
-      </div>
-    );
-  }
-
+  // ✅ DESTRUCTURE SAFELY: Destructure the nested item with a fallback
+  const { item } = inventoryItem;
   const currentCount = inventoryItem.counted_units ?? 0;
   const calculatedTotalWeight =
-    inventoryItem.items.unit_type === "weight" &&
-    inventoryItem.items.average_weight_per_unit != null
-      ? (currentCount * inventoryItem.items.average_weight_per_unit).toFixed(2)
+    item?.unit_type === "weight" && item?.average_weight_per_unit != null
+      ? (currentCount * item.average_weight_per_unit).toFixed(2)
       : null;
+
+  const isFirstItem = currentIndex === 0;
+  const isLastItem = currentIndex === totalItems - 1;
+  const isUpdating = updateInventoryItemMutation.isPending;
 
   return (
     <div className='container mx-auto p-4 max-w-2xl bg-background-base mt-4 rounded-lg'>
       <header className='flex justify-between items-center mb-6'>
         <h1 className='text-3xl font-bold text-foreground'>
-          Viewing Item: {inventoryItem.items.name}
+          {/* ✅ SAFETY: Use optional chaining and fallback */}
+          Viewing Item: {item?.name ?? "Loading..."}
         </h1>
         <button
           onClick={() => router.push(`/inventories/${inventoryId}`)}
@@ -255,30 +239,30 @@ export default function InventoryItemDetailPage() {
 
       <main className='bg-background-surface p-6 rounded-lg shadow-md border border-border-base'>
         <div className='grid grid-cols-1 md:grid-cols-2 gap-4 text-lg mb-6'>
-          <p className='text-text-base'>
+          {/* ✅ SAFETY: Use optional chaining throughout the JSX */}
+          <p>
             <span className='font-semibold'>Item Name:</span>{" "}
-            {inventoryItem.items.name}
+            {item?.name ?? "N/A"}
           </p>
-          <p className='text-text-base'>
+          <p>
             <span className='font-semibold'>Unit Type:</span>{" "}
-            <span className='capitalize'>{inventoryItem.items.unit_type}</span>
+            <span className='capitalize'>{item?.unit_type ?? "N/A"}</span>
           </p>
-          <p className='text-text-base'>
+          <p>
             <span className='font-semibold'>UPC Number:</span>{" "}
-            {inventoryItem.items.upc_number || "N/A"}
+            {item?.upc_number || "N/A"}
           </p>
-          {inventoryItem.items.unit_type === "weight" && (
-            <p className='text-text-base'>
+          {item?.unit_type === "weight" && (
+            <p>
               <span className='font-semibold'>Avg. Unit Weight:</span>{" "}
-              {inventoryItem.items.average_weight_per_unit?.toFixed(2) || "N/A"}{" "}
-              lbs
+              {item?.average_weight_per_unit?.toFixed(2) || "N/A"} lbs
             </p>
           )}
-          <p className='text-text-base'>
+          <p>
             <span className='font-semibold'>Master Item ID:</span>{" "}
             {inventoryItem.item_id}
           </p>
-          <p className='text-text-base'>
+          <p>
             <span className='font-semibold'>Inventory Item ID:</span>{" "}
             {inventoryItem.id}
           </p>
@@ -293,19 +277,15 @@ export default function InventoryItemDetailPage() {
           </div>
 
           <div className='flex flex-col gap-4 items-center'>
-            <label htmlFor='countInput' className='sr-only'>
-              Enter value to add, subtract, or replace
-            </label>
             <input
               id='countInput'
               type='number'
-              step={inventoryItem.items.unit_type === "quantity" ? "1" : "any"}
+              step={item?.unit_type === "quantity" ? "1" : "any"}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder='Enter value'
               className='p-3 border border-border-base rounded-lg shadow-sm text-center text-foreground bg-background w-full max-w-xs focus:outline-none focus:ring-2 focus:ring-primary'
             />
-
             <div className='flex flex-wrap justify-center gap-3 w-full max-w-xs'>
               <button
                 onClick={() => handleOperation("add")}
@@ -339,7 +319,6 @@ export default function InventoryItemDetailPage() {
           )}
         </div>
 
-        {/* Navigation Buttons */}
         <div className='mt-8 flex justify-between items-center pt-6'>
           <button
             onClick={handlePrevious}

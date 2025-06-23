@@ -1,18 +1,19 @@
-// src/lib/utils.ts
 import { InventoryItem, Item } from "@/types";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-type CountableItem = InventoryItem & { items: Item };
+// FIXED: The property is 'item' (singular) to match the actual data structure.
+type CountableItem = InventoryItem & { item: Item };
 
-// Helper for case-insensitive string comparison, treating null/undefined as last
+// Helper for case-insensitive string comparison, treating null/undefined as last.
+// This helper is well-written and can remain as is.
 const compare = (
   valA: string | null | undefined,
   valB: string | null | undefined
 ): number => {
-  if (!valA && !valB) return 0;
-  if (!valA) return 1; // a is null/undefined, comes after b
-  if (!valB) return -1; // b is null/undefined, comes after a
+  if (valA === valB) return 0; // Handles both being null/undefined or identical
+  if (valA === null || valA === undefined) return 1; // a is null/undefined, comes after b
+  if (valB === null || valB === undefined) return -1; // b is null/undefined, comes after a
   return valA.localeCompare(valB);
 };
 
@@ -26,21 +27,21 @@ export const sortForCountMode = (items: CountableItem[]): CountableItem[] => {
   const sortableItems = [...items];
   sortableItems.sort((a, b) => {
     // 1. Primary Sort: by Item Type
-    let comparison = compare(a.items.item_type, b.items.item_type);
+    // CHANGED: Access 'item' and added optional chaining (?.) for safety.
+    let comparison = compare(a.item?.item_type, b.item?.item_type);
     if (comparison !== 0) return comparison;
 
     // 2. Secondary Sort: by Brand
-    comparison = compare(a.items.brand, b.items.brand);
+    comparison = compare(a.item?.brand, b.item?.brand);
     if (comparison !== 0) return comparison;
 
     // 3. Tertiary Sort: by Name
-    return compare(a.items.name, b.items.name);
+    return compare(a.item?.name, b.item?.name);
   });
   return sortableItems;
 };
 
 /**
- * 👇 NEW FUNCTION ADDED HERE
  * Sorts an array of inventory items by Item Type only.
  * Order: 1. Item Type (asc), 2. Name (asc) as a tie-breaker
  * @param items - The array of inventory items to sort.
@@ -52,11 +53,12 @@ export const sortForItemTypeOnly = (
   const sortableItems = [...items];
   sortableItems.sort((a, b) => {
     // 1. Primary Sort: by Item Type
-    const comparison = compare(a.items.item_type, b.items.item_type);
+    // CHANGED: Access 'item' and added optional chaining (?.) for safety.
+    const comparison = compare(a.item?.item_type, b.item?.item_type);
     if (comparison !== 0) return comparison;
 
     // 2. Secondary (tie-breaker) Sort: by Name
-    return compare(a.items.name, b.items.name);
+    return compare(a.item?.name, b.item?.name);
   });
   return sortableItems;
 };

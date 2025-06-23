@@ -19,9 +19,10 @@ export async function GET(
   request: Request,
   { params }: { params: { inventoryItemId: string } }
 ) {
+  const Params = await params;
   try {
     const userId = await getUserIdFromSession(); // Authenticate and get user ID
-    const inventoryItemId = params.inventoryItemId;
+    const inventoryItemId = Params.inventoryItemId;
 
     const inventoryItem = await prisma.inventoryItem.findUnique({
       where: {
@@ -140,7 +141,8 @@ export async function DELETE(
 ) {
   try {
     const userId = await getUserIdFromSession();
-    const inventoryItemId = params.inventoryItemId;
+    const Params = await params;
+    const inventoryItemId = Params.inventoryItemId;
 
     const existingInventoryItem = await prisma.inventoryItem.findUnique({
       where: { id: inventoryItemId },

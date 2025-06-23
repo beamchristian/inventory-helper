@@ -3,25 +3,55 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/db/db";
 import { auth } from "@/lib/auth";
 
-async function getUserIdFromSession() {
-  const session = await auth();
-  if (!session || !session.user || !session.user.id) {
-    throw new Error("User not authenticated.");
+// REFACTORED: Centralized error handler for this resource.
+function handleError(error: unknown): NextResponse {
+  console.error("API Error:", error);
+  if (error instanceof Error) {
+    if (error.message.includes("Authentication required")) {
+      return NextResponse.json(
+        { message: "Authentication required." },
+        { status: 401 }
+      );
+    }
   }
-  return session.user.id;
+  // Handle Prisma's "Record Not Found" error
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    error.code === "P2025"
+  ) {
+    return NextResponse.json(
+      { message: "Inventory not found or you do not have permission." },
+      { status: 404 }
+    );
+  }
+  const errorMessage =
+    error instanceof Error ? error.message : "An unknown error occurred.";
+  return NextResponse.json(
+    { message: "An internal error occurred.", error: errorMessage },
+    { status: 500 }
+  );
 }
 
-// GET (Optional, if you need to fetch a single inventory by ID)
+// GET handler
 export async function GET(
   request: Request,
   { params }: { params: { inventoryId: string } }
 ) {
   try {
-    const userId = await getUserIdFromSession();
-    const inventoryId = params.inventoryId;
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Authentication required");
+    }
+    const userId = session.user.id;
 
+    // REFACTORED: Single query for secure fetching.
     const inventory = await prisma.inventory.findUnique({
-      where: { id: inventoryId },
+      where: {
+        id: params.inventoryId,
+        userId: userId, // Enforce ownership
+      },
     });
 
     if (!inventory) {
@@ -31,130 +61,57 @@ export async function GET(
       );
     }
 
-    if (inventory.userId !== userId) {
-      return NextResponse.json(
-        { message: "Unauthorized access to inventory." },
-        { status: 403 }
-      );
-    }
-
     return NextResponse.json(inventory);
-  } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
-    console.error("Error fetching single inventory:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    if (errorMessage.includes("User not authenticated.")) {
-      return NextResponse.json(
-        { message: "Authentication required." },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json(
-      { message: errorMessage || "Failed to fetch inventory." },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }
 
-// PATCH to update an existing inventory
+// PATCH handler
 export async function PATCH(
   request: Request,
   { params }: { params: { inventoryId: string } }
 ) {
   try {
-    const userId = await getUserIdFromSession();
-    const inventoryId = params.inventoryId;
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Authentication required");
+    }
+    const userId = session.user.id;
     const body = await request.json();
 
-    const existingInventory = await prisma.inventory.findUnique({
-      where: { id: inventoryId },
-    });
-
-    if (!existingInventory) {
-      return NextResponse.json(
-        { message: "Inventory not found." },
-        { status: 404 }
-      );
-    }
-
-    if (existingInventory.userId !== userId) {
-      return NextResponse.json(
-        { message: "Unauthorized: You do not own this inventory." },
-        { status: 403 }
-      );
-    }
-
+    // REFACTORED: Atomic update operation.
     const updatedInventory = await prisma.inventory.update({
       where: {
-        id: inventoryId,
-        userId: userId,
+        id: params.inventoryId,
+        userId: userId, // Enforce ownership
       },
       data: body,
     });
 
     return NextResponse.json(updatedInventory);
-  } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
-    console.error("Error updating inventory:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "P2025"
-    ) {
-      // Specific Prisma error check
-      return NextResponse.json(
-        { message: "Inventory not found or you do not have permission." },
-        { status: 404 }
-      );
-    }
-    if (errorMessage.includes("User not authenticated.")) {
-      return NextResponse.json(
-        { message: "Authentication required." },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json(
-      { message: errorMessage || "Failed to update inventory." },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }
 
-// DELETE an inventory
+// DELETE handler
 export async function DELETE(
   request: Request,
   { params }: { params: { inventoryId: string } }
 ) {
   try {
-    const userId = await getUserIdFromSession();
-    const inventoryId = params.inventoryId;
-
-    const existingInventory = await prisma.inventory.findUnique({
-      where: { id: inventoryId },
-    });
-
-    if (!existingInventory) {
-      return NextResponse.json(
-        { message: "Inventory not found." },
-        { status: 404 }
-      );
+    const session = await auth();
+    if (!session?.user?.id) {
+      throw new Error("Authentication required");
     }
+    const userId = session.user.id;
 
-    if (existingInventory.userId !== userId) {
-      return NextResponse.json(
-        { message: "Unauthorized: You do not own this inventory." },
-        { status: 403 }
-      );
-    }
-
+    // REFACTORED: Atomic delete operation.
     await prisma.inventory.delete({
       where: {
-        id: inventoryId,
-        userId: userId,
+        id: params.inventoryId,
+        userId: userId, // Enforce ownership
       },
     });
 
@@ -162,32 +119,7 @@ export async function DELETE(
       { message: "Inventory deleted successfully." },
       { status: 200 }
     );
-  } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
-    console.error("Error deleting inventory:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "An unknown error occurred.";
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "P2025"
-    ) {
-      // Specific Prisma error check
-      return NextResponse.json(
-        { message: "Inventory not found or you do not have permission." },
-        { status: 404 }
-      );
-    }
-    if (errorMessage.includes("User not authenticated.")) {
-      return NextResponse.json(
-        { message: "Authentication required." },
-        { status: 401 }
-      );
-    }
-    return NextResponse.json(
-      { message: errorMessage || "Failed to delete inventory." },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleError(error);
   }
 }
