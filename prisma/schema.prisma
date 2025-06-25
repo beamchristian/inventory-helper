@@ -9,7 +9,10 @@ generator client {
 }
 
 datasource db {
+  // PROD DB:
   provider  = "postgresql"
+  // DEV DB:
+  // provider  = "sqlite"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
@@ -22,7 +25,7 @@ enum Role {
 
 // User model: CRITICAL - This maps to Supabase's auth.users table
 model User {
-  id            String    @id @default(uuid()) @db.Uuid
+  id            String    @id @default(cuid()) // @db.Uuid here
   name          String?
   email         String    @unique
   emailVerified DateTime?
@@ -33,7 +36,6 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   accounts      Account[]
-  sessions      Session[]
   // Optional for WebAuthn support
   Authenticator Authenticator[]
   Inventory     Inventory[]
@@ -42,16 +44,16 @@ model User {
 // NextAuth related tables, typically in the 'public' schema
 model Account {
   id                String  @id @default(cuid())
-  userId            String  @db.Uuid // <--- ADD @db.Uuid HERE
+  userId            String // <--- ADD @db.Uuid HERE
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
 
   createdAt DateTime @default(now())
@@ -63,30 +65,9 @@ model Account {
 }
 
 // NextAuth related tables, typically in the 'public' schema
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String   @db.Uuid // <--- ADD @db.Uuid HERE
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// NextAuth related tables, typically in the 'public' schema
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-// NextAuth related tables, typically in the 'public' schema
 model Authenticator {
   credentialID         String  @unique
-  userId               String  @db.Uuid // <--- ADD @db.Uuid HERE
+  userId               String // <--- ADD @db.Uuid HERE
   providerAccountId    String
   credentialPublicKey  String
   counter              Int
@@ -102,7 +83,7 @@ model Authenticator {
 // Your custom application tables, typically in the 'public' schema
 model Item {
   id                      String          @id @default(uuid())
-  user_id                 String          @db.Uuid // <--- ADD @db.Uuid HERE
+  user_id                 String // @db.Uuid
   name                    String
   upc_number              String?
   average_weight_per_unit Float?
@@ -125,7 +106,7 @@ model Inventory {
 
   // Define the relation to the User model (which maps to auth.users)
   User   User?   @relation(fields: [userId], references: [id])
-  userId String? @db.Uuid
+  userId String? // @db.Uuid
 }
 
 // Your custom application tables, typically in the 'public' schema

@@ -1,3 +1,5 @@
-import { handlers } from "@/lib/auth";
+import { GET, POST } from "@/auth";
 
-export const { GET, POST } = handlers;
+// The GET and POST handlers are already exported from your auth.ts file.
+// You just need to re-export them here for Next.js to create the API route.
+export { GET, POST };

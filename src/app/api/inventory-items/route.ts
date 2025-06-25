@@ -3,8 +3,8 @@
 // This route is specifically for CREATING NEW MASTER ITEMS (used by /settings page)
 
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db";
-import { auth } from "@/lib/auth";
+import { db } from "@/lib/db/db";
+import { auth } from "@/auth";
 
 /**
  * Handles POST requests to create a new Master Item.
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     const finalAverageWeight =
       unit_type === "quantity" ? null : average_weight_per_unit;
 
-    const newMasterItem = await prisma.item.create({
+    const newMasterItem = await db.item.create({
       data: {
         user_id: session.user.id,
         name,

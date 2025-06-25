@@ -4,8 +4,8 @@
 // It manages InventoryItem records, not new master Items.
 
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db"; // Import the shared prisma client instance
-import { auth } from "@/lib/auth"; // Import your custom auth helper
+import { db } from "@/lib/db/db"; // Import the shared prisma client instance
+import { auth } from "@/auth"; // Import your custom auth helper
 
 /**
  * Handles GET requests to fetch all InventoryItems for a specific Inventory.
@@ -26,8 +26,9 @@ export async function GET(
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
+    const Params = await params;
 
-    const { inventoryId } = params;
+    const { inventoryId } = Params;
 
     if (!inventoryId) {
       return NextResponse.json(
@@ -37,7 +38,7 @@ export async function GET(
     }
 
     // Verify the inventory exists and belongs to the user
-    const inventory = await prisma.inventory.findFirst({
+    const inventory = await db.inventory.findFirst({
       where: {
         id: inventoryId,
         userId: session.user.id,
@@ -52,7 +53,7 @@ export async function GET(
     }
 
     // Fetch all InventoryItems for this inventory, including their associated Master Item details
-    const inventoryItems = await prisma.inventoryItem.findMany({
+    const inventoryItems = await db.inventoryItem.findMany({
       where: {
         inventory_id: inventoryId,
       },
@@ -102,8 +103,8 @@ export async function POST(
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-
-    const { inventoryId } = params;
+    const Params = await params;
+    const { inventoryId } = Params;
     const { item_id, counted_units } = await req.json();
 
     // Basic validation
@@ -115,7 +116,7 @@ export async function POST(
     }
 
     // Use findFirst to query by multiple non-unique fields like id and userId
-    const inventory = await prisma.inventory.findFirst({
+    const inventory = await db.inventory.findFirst({
       where: {
         id: inventoryId,
         userId: session.user.id,
@@ -130,7 +131,7 @@ export async function POST(
     }
 
     // Check if the item already exists in this inventory
-    const existingInventoryItem = await prisma.inventoryItem.findFirst({
+    const existingInventoryItem = await db.inventoryItem.findFirst({
       where: {
         inventory_id: inventoryId,
         item_id: item_id,
@@ -145,7 +146,7 @@ export async function POST(
     }
 
     // Create the new InventoryItem record
-    const newInventoryItem = await prisma.inventoryItem.create({
+    const newInventoryItem = await db.inventoryItem.create({
       data: {
         inventory_id: inventoryId,
         item_id: item_id,
@@ -190,8 +191,8 @@ export async function DELETE(
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-
-    const { inventoryId } = params;
+    const Params = await params;
+    const { inventoryId } = Params;
     const { inventoryItemId } = await req.json(); // Expected from the client
 
     if (!inventoryId || !inventoryItemId) {
@@ -205,7 +206,7 @@ export async function DELETE(
     }
 
     // Verify ownership of the inventory and the inventory item
-    const inventoryItemToDelete = await prisma.inventoryItem.findUnique({
+    const inventoryItemToDelete = await db.inventoryItem.findUnique({
       where: {
         id: inventoryItemId,
         inventory_id: inventoryId, // Ensure it belongs to this specific inventory
@@ -234,7 +235,7 @@ export async function DELETE(
       );
     }
 
-    await prisma.inventoryItem.delete({
+    await db.inventoryItem.delete({
       where: {
         id: inventoryItemId,
       },

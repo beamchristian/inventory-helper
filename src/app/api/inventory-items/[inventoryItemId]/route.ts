@@ -2,8 +2,8 @@
 // This file will handle GET, PATCH, and DELETE for a single InventoryItem
 
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db"; // Your Prisma client instance
-import { auth } from "@/lib/auth";
+import { db } from "@/lib/db/db"; // Your Prisma client instance
+import { auth } from "@/auth";
 
 // Helper to get userId securely on the server
 async function getUserIdFromSession() {
@@ -24,7 +24,7 @@ export async function GET(
     const userId = await getUserIdFromSession(); // Authenticate and get user ID
     const inventoryItemId = Params.inventoryItemId;
 
-    const inventoryItem = await prisma.inventoryItem.findUnique({
+    const inventoryItem = await db.inventoryItem.findUnique({
       where: {
         id: inventoryItemId,
       },
@@ -77,11 +77,12 @@ export async function PATCH(
 ) {
   try {
     const userId = await getUserIdFromSession();
-    const inventoryItemId = params.inventoryItemId;
+    const Params = await params;
+    const inventoryItemId = Params.inventoryItemId;
     const body = await request.json(); // Expected: { counted_units?: number, calculated_weight?: number }
 
     // Find the inventoryItem and its associated inventory to ensure ownership
-    const existingInventoryItem = await prisma.inventoryItem.findUnique({
+    const existingInventoryItem = await db.inventoryItem.findUnique({
       where: { id: inventoryItemId },
       include: { inventory: true },
     });
@@ -100,7 +101,7 @@ export async function PATCH(
       );
     }
 
-    const updatedInventoryItem = await prisma.inventoryItem.update({
+    const updatedInventoryItem = await db.inventoryItem.update({
       where: { id: inventoryItemId },
       data: {
         counted_units: body.counted_units,
@@ -144,7 +145,7 @@ export async function DELETE(
     const Params = await params;
     const inventoryItemId = Params.inventoryItemId;
 
-    const existingInventoryItem = await prisma.inventoryItem.findUnique({
+    const existingInventoryItem = await db.inventoryItem.findUnique({
       where: { id: inventoryItemId },
       include: { inventory: true }, // Include inventory to check ownership
     });
@@ -163,7 +164,7 @@ export async function DELETE(
       );
     }
 
-    await prisma.inventoryItem.delete({
+    await db.inventoryItem.delete({
       where: {
         id: inventoryItemId,
       },

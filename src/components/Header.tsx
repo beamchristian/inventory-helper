@@ -39,7 +39,7 @@ export default function Header() {
             </div>
           ) : (
             <Link
-              href='/auth/sign-in'
+              href='/sign-in'
               className='hover:text-white/90 transition-colors'
             >
               Sign In

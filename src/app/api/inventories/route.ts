@@ -1,7 +1,7 @@
 // src/app/api/inventories/route.ts
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db";
-import { auth } from "@/lib/auth";
+import { db } from "@/lib/db/db";
+import { auth } from "@/auth";
 
 async function getUserIdFromSession() {
   const session = await auth();
@@ -16,7 +16,7 @@ export async function GET() {
   try {
     const userId = await getUserIdFromSession();
 
-    const inventories = await prisma.inventory.findMany({
+    const inventories = await db.inventory.findMany({
       where: {
         userId: userId,
       },
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const newInventory = await prisma.inventory.create({
+    const newInventory = await db.inventory.create({
       data: {
         userId: userId,
         name,

@@ -1,71 +1,21 @@
-import { auth } from "@/lib/auth";
-
-import { signIn } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { executeAction } from "@/lib/executeAction";
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import LoginForm from "@/components/LoginForm";
 
-const Page = async () => {
+const SignInPage = async () => {
   const session = await auth();
-  if (session) redirect("/");
+  if (session) {
+    // If the user is already signed in, redirect them to the homepage.
+    redirect("/");
+  }
 
   return (
-    <div className='w-full max-w-sm mx-auto space-y-6'>
-      <h1 className='text-2xl font-bold text-center mb-6 text-card-foreground'>
-        Sign In
-      </h1>
-
-      <div className='relative'>
-        <div className='absolute inset-0 flex items-center mb-7'>
-          <span className='w-full border-t border-border' />
-        </div>
-        <div className='relative flex justify-center text-sm'>
-          <span className='px-2 mt-4 text-muted-foreground'>
-            Enter Email Below
-          </span>
-        </div>
-      </div>
-
-      {/* Email/Password Sign In */}
-      <form
-        className='space-y-4'
-        action={async (formData: FormData) => {
-          "use server";
-          await executeAction({
-            actionFn: async () => {
-              await signIn("credentials", formData);
-            },
-          });
-        }}
-      >
-        <Input
-          name='email'
-          placeholder='Email'
-          type='email'
-          required
-          autoComplete='email'
-        />
-        <Input
-          name='password'
-          placeholder='Password'
-          type='password'
-          required
-          autoComplete='current-password'
-        />
-        <Button className='w-full' type='submit'>
-          Sign In
-        </Button>
-      </form>
-
-      <div className='text-center'>
-        <Button asChild variant='link'>
-          <Link href='/sign-up'>Don&apos;t have an account? Sign up</Link>
-        </Button>
-      </div>
+    <div className='w-full flex mt-20 justify-center'>
+      <section className='flex flex-col w-[400px]'>
+        <LoginForm />
+      </section>
     </div>
   );
 };
 
-export default Page;
+export default SignInPage;

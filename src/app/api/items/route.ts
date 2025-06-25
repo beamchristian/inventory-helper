@@ -2,8 +2,8 @@
 // This API route handles GET and POST operations for all master Items.
 
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db";
-import { auth } from "@/lib/auth";
+import { db } from "@/lib/db/db";
+import { auth } from "@/auth";
 
 async function getUserIdFromSession() {
   const session = await auth();
@@ -18,7 +18,7 @@ export async function GET() {
   try {
     const userId = await getUserIdFromSession();
 
-    const items = await prisma.item.findMany({
+    const items = await db.item.findMany({
       where: {
         user_id: userId,
       },
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     const finalAverageWeight =
       unit_type === "quantity" ? null : average_weight_per_unit;
 
-    const newItem = await prisma.item.create({
+    const newItem = await db.item.create({
       data: {
         user_id: userId,
         name,

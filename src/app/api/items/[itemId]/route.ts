@@ -1,7 +1,7 @@
 // src/app/api/items/[itemId]/route.ts
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db";
-import { auth } from "@/lib/auth";
+import { db } from "@/lib/db/db";
+import { auth } from "@/auth";
 
 // REFACTORED: Centralized error handler to reduce repetition.
 function handleError(error: unknown): NextResponse {
@@ -47,7 +47,7 @@ export async function GET(
     const userId = session.user.id;
 
     // REFACTORED: Use a single query to find the item ONLY if it belongs to the user.
-    const item = await prisma.item.findUnique({
+    const item = await db.item.findUnique({
       where: {
         id: params.itemId,
         user_id: userId, // Combine the ownership check into the query
@@ -82,7 +82,7 @@ export async function PATCH(
     // REFACTORED: Use a single 'update' call. Prisma will fail with a P2025 error
     // if the 'where' clause doesn't find a matching record (i.e., wrong ID or wrong user).
     // This eliminates the need for a separate 'findUnique' call first.
-    const updatedItem = await prisma.item.update({
+    const updatedItem = await db.item.update({
       where: {
         id: params.itemId,
         user_id: userId, // Enforce ownership
@@ -110,7 +110,7 @@ export async function DELETE(
 
     // REFACTORED: Use a single 'delete' call. Like 'update', this is an atomic
     // operation that checks ownership and deletes in one step.
-    await prisma.item.delete({
+    await db.item.delete({
       where: {
         id: params.itemId,
         user_id: userId, // Enforce ownership

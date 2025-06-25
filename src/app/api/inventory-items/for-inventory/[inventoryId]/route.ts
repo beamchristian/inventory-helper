@@ -3,8 +3,8 @@
 // and ensures they belong to the authenticated user.
 
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db"; // Your Prisma client instance
-import { auth } from "@/lib/auth"; // Your NextAuth.js server-side auth helper
+import { db } from "@/lib/db/db"; // Your Prisma client instance
+import { auth } from "@/auth"; // Your NextAuth.js server-side auth helper
 
 // Helper to get userId securely on the server
 async function getUserIdFromSession() {
@@ -22,7 +22,8 @@ export async function GET(
 ) {
   try {
     const userId = await getUserIdFromSession(); // Authenticate and get user ID
-    const inventoryId = params.inventoryId;
+    const Params = await params;
+    const inventoryId = Params.inventoryId;
 
     if (!inventoryId) {
       return NextResponse.json(
@@ -32,7 +33,7 @@ export async function GET(
     }
 
     // First, verify that the inventory itself belongs to the user
-    const inventory = await prisma.inventory.findUnique({
+    const inventory = await db.inventory.findUnique({
       where: { id: inventoryId },
       select: { userId: true }, // Only select userId for authorization check
     });
@@ -53,7 +54,7 @@ export async function GET(
 
     // Fetch all InventoryItems related to this inventory,
     // and include their associated Item details.
-    const inventoryItems = await prisma.inventoryItem.findMany({
+    const inventoryItems = await db.inventoryItem.findMany({
       where: {
         inventory_id: inventoryId,
       },

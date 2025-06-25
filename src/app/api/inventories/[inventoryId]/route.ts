@@ -1,7 +1,7 @@
 // src/app/api/inventories/[inventoryId]/route.ts
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db";
-import { auth } from "@/lib/auth";
+import { db } from "@/lib/db/db";
+import { auth } from "@/auth";
 
 // REFACTORED: Centralized error handler for this resource.
 function handleError(error: unknown): NextResponse {
@@ -47,7 +47,7 @@ export async function GET(
     const userId = session.user.id;
 
     // REFACTORED: Single query for secure fetching.
-    const inventory = await prisma.inventory.findUnique({
+    const inventory = await db.inventory.findUnique({
       where: {
         id: params.inventoryId,
         userId: userId, // Enforce ownership
@@ -81,7 +81,7 @@ export async function PATCH(
     const body = await request.json();
 
     // REFACTORED: Atomic update operation.
-    const updatedInventory = await prisma.inventory.update({
+    const updatedInventory = await db.inventory.update({
       where: {
         id: params.inventoryId,
         userId: userId, // Enforce ownership
@@ -108,7 +108,7 @@ export async function DELETE(
     const userId = session.user.id;
 
     // REFACTORED: Atomic delete operation.
-    await prisma.inventory.delete({
+    await db.inventory.delete({
       where: {
         id: params.inventoryId,
         userId: userId, // Enforce ownership

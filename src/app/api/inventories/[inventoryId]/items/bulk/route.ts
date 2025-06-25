@@ -2,8 +2,8 @@
 // This version uses @ts-expect-error to satisfy ESLint and bypass the build error.
 
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/db/db";
-import { auth } from "@/lib/auth";
+import { db } from "@/lib/db/db";
+import { auth } from "@/auth";
 
 /**
  * Handles POST requests to add all available master items to a specific Inventory.
@@ -22,8 +22,8 @@ export async function POST(
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-
-    const { inventoryId } = params;
+    const Params = await params;
+    const { inventoryId } = Params;
 
     if (!inventoryId) {
       return NextResponse.json(
@@ -33,7 +33,7 @@ export async function POST(
     }
 
     // 1. Verify the inventory exists and belongs to the user
-    const inventory = await prisma.inventory.findFirst({
+    const inventory = await db.inventory.findFirst({
       where: {
         id: inventoryId,
         userId: session.user.id,
@@ -48,7 +48,7 @@ export async function POST(
     }
 
     // 2. Fetch all master items created by this user
-    const allUserMasterItems = await prisma.item.findMany({
+    const allUserMasterItems = await db.item.findMany({
       where: {
         user_id: session.user.id,
       },
@@ -61,7 +61,7 @@ export async function POST(
     );
 
     // 3. Fetch all items currently in this specific inventory
-    const currentInventoryItems = await prisma.inventoryItem.findMany({
+    const currentInventoryItems = await db.inventoryItem.findMany({
       where: {
         inventory_id: inventoryId,
       },
@@ -96,9 +96,9 @@ export async function POST(
     }));
 
     // 6. Bulk create new InventoryItem records
-    const result = await prisma.inventoryItem.createMany({
+    const result = await db.inventoryItem.createMany({
       data: dataToCreate,
-      skipDuplicates: true,
+      // skipDuplicates: true,
     });
 
     return NextResponse.json(

@@ -2004,7 +2004,7 @@ async function main() {
       );
       await prisma.item.createMany({
         data: itemsToCreate,
-        skipDuplicates: true,
+        // skipDuplicates: true,
       });
       console.log(`Successfully created ${itemsToCreate.length} items.`);
     } else {

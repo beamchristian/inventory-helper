@@ -1,4 +1,5 @@
 import { InventoryItem, Item } from "@/types";
+import bcrypt from "bcryptjs";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -65,4 +66,11 @@ export const sortForItemTypeOnly = (
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+export function saltAndHashPassword(password: any) {
+  const saltRounds = 10;
+  const salt = bcrypt.genSaltSync(saltRounds);
+  const hash = bcrypt.hashSync(password, salt);
+  return hash;
 }

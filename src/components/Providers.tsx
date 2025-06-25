@@ -26,8 +26,6 @@ export default function Providers({ children, session }: ProvidersProps) {
   // NEW: Accept session prop
   return (
     <SessionProvider session={session}>
-      {" "}
-      {/* Pass the session prop to NextAuth's SessionProvider */}
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </SessionProvider>
   );

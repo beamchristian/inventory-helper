@@ -94,7 +94,7 @@ export default function SettingsPage() {
   // (Primary redirect happens in layout.tsx, this is a fallback for dynamic auth changes)
   useEffect(() => {
     if (status === "unauthenticated") {
-      window.location.href = "/auth/sign-in"; // Use window.location for hard redirect
+      window.location.href = "/sign-in"; // Use window.location for hard redirect
     }
   }, [status]);
 
@@ -364,7 +364,7 @@ export default function SettingsPage() {
               : `Error loading items: ${errorMessage}`}
           </p>
           <button
-            onClick={() => (window.location.href = "/auth/sign-in")}
+            onClick={() => (window.location.href = "/sign-in")}
             className='mt-4 bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded'
           >
             Go to Sign In

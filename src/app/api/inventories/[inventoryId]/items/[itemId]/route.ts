@@ -1,7 +1,7 @@
 // src/app/api/inventories/[inventoryId]/items/[itemId]/route.ts
 import { NextResponse } from "next/server";
-import prisma from "@/lib/db/db";
-import { auth } from "@/lib/auth";
+import { db } from "@/lib/db/db";
+import { auth } from "@/auth";
 
 /**
  * GET handler to fetch a single InventoryItem by its ID,
@@ -21,9 +21,10 @@ export async function GET(
       );
     }
     const userId = session.user.id;
-    const { itemId } = params;
+    const Params = await params;
+    const { itemId } = Params;
 
-    const inventoryItem = await prisma.inventoryItem.findFirst({
+    const inventoryItem = await db.inventoryItem.findFirst({
       where: {
         // Ensure the item ID matches
         id: itemId,
@@ -60,3 +61,74 @@ export async function GET(
 
 // You can also add PATCH and DELETE handlers here later if needed
 // to update or delete a single inventory item.
+// --- 👇 ADD THIS ENTIRE PATCH FUNCTION 👇 ---
+
+/**
+ * PATCH handler to update an InventoryItem (e.g., its counted_units).
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: { inventoryId: string; itemId: string } }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { message: "Authentication required" },
+        { status: 401 }
+      );
+    }
+    const userId = session.user.id;
+    const Params = await params;
+    const { itemId } = Params;
+    const body = await request.json();
+
+    // The data to update, likely just the count
+    const { counted_units } = body;
+
+    if (typeof counted_units !== "number") {
+      return NextResponse.json(
+        { message: "Invalid 'counted_units' value provided." },
+        { status: 400 }
+      );
+    }
+
+    // Use a single 'update' call. Prisma will fail if the where clause doesn't find
+    // a matching record (i.e., wrong ID or inventory not owned by the user).
+    // This is more efficient and secure than fetching first.
+    const updatedInventoryItem = await db.inventoryItem.update({
+      where: {
+        id: itemId,
+        // Enforce ownership by checking the relation
+        inventory: {
+          userId: userId,
+        },
+      },
+      data: {
+        counted_units: counted_units,
+      },
+    });
+
+    return NextResponse.json(updatedInventoryItem);
+  } catch (error: unknown) {
+    console.error("Failed to update inventory item:", error);
+    // Handle Prisma's "Record Not Found" error which also covers the authorization check
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2025"
+    ) {
+      return NextResponse.json(
+        { message: "Item to update not found or you do not have permission." },
+        { status: 404 }
+      );
+    }
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred";
+    return NextResponse.json(
+      { message: "Failed to update item", error: errorMessage },
+      { status: 500 }
+    );
+  }
+}

@@ -82,6 +82,7 @@ type CombinedInventoryItem = InventoryItem & { item: Item };
 export default function InventoryDetailPage() {
   const router = useRouter();
   const params = useParams();
+
   const inventoryId = params.inventoryId as string;
 
   const { data: sessionData, status } = useSession(); // Fixed: Destructure as sessionData
@@ -141,7 +142,7 @@ export default function InventoryDetailPage() {
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      router.push("/auth/sign-in");
+      router.push("/sign-in");
     }
   }, [status, router]);
 
