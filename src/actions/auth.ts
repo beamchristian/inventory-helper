@@ -28,6 +28,8 @@ export const login = async (provider: string) => {
   revalidatePath("/");
 };
 
+
+
 export const logout = async () => {
   await signOut({ redirectTo: "/" });
   revalidatePath("/");

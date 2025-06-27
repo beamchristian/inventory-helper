@@ -1,4 +1,4 @@
-import { signUp } from "@/lib/actions";
+// import { signUp } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { redirect } from "next/navigation";
@@ -29,7 +29,7 @@ const Page = async () => {
         </div>
       </div>
       {/* Email/Password Sign Up */}
-      <form
+      {/* <form
         className='space-y-4'
         action={async (formData: FormData) => {
           "use server";
@@ -56,7 +56,7 @@ const Page = async () => {
         <Button className='w-full' type='submit'>
           Sign Up
         </Button>
-      </form>
+      </form> */}
       <div className='text-center'>
         <Button asChild variant='link'>
           <Link
