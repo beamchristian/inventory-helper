@@ -1,7 +1,6 @@
 "use server";
 
 import { signIn, signOut } from "@/auth";
-import { db } from "@/lib/db/db";
 import { AuthError } from "next-auth"; // Import the specific error type
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { revalidatePath } from "next/cache";
@@ -11,24 +10,10 @@ export interface ActionState {
   error?: string;
 }
 
-const getUserByEmail = async (email: string) => {
-  try {
-    const user = await db.user.findUnique({
-      where: { email },
-    });
-    return user;
-  } catch (error) {
-    console.error("Error fetching user:", error);
-    return null;
-  }
-};
-
 export const login = async (provider: string) => {
   await signIn(provider, { redirectTo: "/" });
   revalidatePath("/");
 };
-
-
 
 export const logout = async () => {
   await signOut({ redirectTo: "/" });
