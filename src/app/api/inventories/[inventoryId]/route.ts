@@ -37,16 +37,17 @@ function handleError(error: unknown): NextResponse {
 // GET handler
 export async function GET(
   request: Request,
-  { params }: { params: { inventoryId: string } }
+  context: {
+    params: Promise<{ inventoryId: string }>;
+  }
 ) {
-  const { inventoryId } = await params;
   try {
     const session = await auth();
     if (!session?.user?.id) {
       throw new Error("Authentication required");
     }
     const userId = session.user.id;
-
+    const inventoryId = (await context.params).inventoryId;
     // REFACTORED: Single query for secure fetching.
     const inventory = await db.inventory.findUnique({
       where: {
@@ -71,7 +72,9 @@ export async function GET(
 // PATCH handler
 export async function PATCH(
   request: Request,
-  { params }: { params: { inventoryId: string } }
+  context: {
+    params: Promise<{ inventoryId: string }>;
+  }
 ) {
   try {
     const session = await auth();
@@ -80,11 +83,11 @@ export async function PATCH(
     }
     const userId = session.user.id;
     const body = await request.json();
-
+    const inventoryId = (await context.params).inventoryId;
     // REFACTORED: Atomic update operation.
     const updatedInventory = await db.inventory.update({
       where: {
-        id: params.inventoryId,
+        id: inventoryId,
         userId: userId, // Enforce ownership
       },
       data: body,
@@ -99,7 +102,9 @@ export async function PATCH(
 // DELETE handler
 export async function DELETE(
   request: Request,
-  { params }: { params: { inventoryId: string } }
+  context: {
+    params: Promise<{ inventoryId: string }>;
+  }
 ) {
   try {
     const session = await auth();
@@ -107,11 +112,11 @@ export async function DELETE(
       throw new Error("Authentication required");
     }
     const userId = session.user.id;
-
+    const inventoryId = (await context.params).inventoryId;
     // REFACTORED: Atomic delete operation.
     await db.inventory.delete({
       where: {
-        id: params.inventoryId,
+        id: inventoryId,
         userId: userId, // Enforce ownership
       },
     });

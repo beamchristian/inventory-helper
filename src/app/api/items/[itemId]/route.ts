@@ -37,15 +37,17 @@ function handleError(error: unknown): NextResponse {
 // GET handler to fetch a single Item by ID
 export async function GET(
   request: Request,
-  { params }: { params: { itemId: string } }
+  context: {
+    params: Promise<{ itemId: string }>;
+  }
 ) {
-  const { itemId } = await params;
   try {
     const session = await auth();
     if (!session?.user?.id) {
       throw new Error("Authentication required");
     }
     const userId = session.user.id;
+    const itemId = (await context.params).itemId;
 
     // REFACTORED: Use a single query to find the item ONLY if it belongs to the user.
     const item = await db.item.findUnique({
@@ -70,7 +72,9 @@ export async function GET(
 // PATCH handler to update a single Item by ID
 export async function PATCH(
   request: Request,
-  { params }: { params: { itemId: string } }
+  context: {
+    params: Promise<{ itemId: string }>;
+  }
 ) {
   try {
     const session = await auth();
@@ -78,6 +82,7 @@ export async function PATCH(
       throw new Error("Authentication required");
     }
     const userId = session.user.id;
+    const itemId = (await context.params).itemId;
     const body = await request.json();
 
     // REFACTORED: Use a single 'update' call. Prisma will fail with a P2025 error
@@ -85,7 +90,7 @@ export async function PATCH(
     // This eliminates the need for a separate 'findUnique' call first.
     const updatedItem = await db.item.update({
       where: {
-        id: params.itemId,
+        id: itemId,
         user_id: userId, // Enforce ownership
       },
       data: body,
@@ -100,15 +105,17 @@ export async function PATCH(
 // DELETE handler to delete a single Item by ID
 export async function DELETE(
   request: Request,
-  { params }: { params: { itemId: string } }
+  context: {
+    params: Promise<{ itemId: string }>;
+  }
 ) {
-  const { itemId } = await params;
   try {
     const session = await auth();
     if (!session?.user?.id) {
       throw new Error("Authentication required");
     }
     const userId = session.user.id;
+    const itemId = (await context.params).itemId;
 
     // REFACTORED: Use a single 'delete' call. Like 'update', this is an atomic
     // operation that checks ownership and deletes in one step.

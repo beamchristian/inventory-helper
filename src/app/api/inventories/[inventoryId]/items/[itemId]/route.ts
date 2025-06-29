@@ -1,4 +1,3 @@
-// src/app/api/inventories/[inventoryId]/items/[itemId]/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
 import { auth } from "@/lib/auth";
@@ -10,7 +9,9 @@ import { auth } from "@/lib/auth";
  */
 export async function GET(
   request: Request,
-  { params }: { params: { inventoryId: string; itemId: string } }
+  context: {
+    params: Promise<{ inventoryId: string; itemId: string }>;
+  }
 ) {
   try {
     const session = await auth();
@@ -21,26 +22,21 @@ export async function GET(
       );
     }
     const userId = session.user.id;
-    const Params = await params;
-    const { itemId } = Params;
+    const itemId = (await context.params).itemId;
 
     const inventoryItem = await db.inventoryItem.findFirst({
       where: {
-        // Ensure the item ID matches
         id: itemId,
-        // And ensure the inventory it belongs to is owned by the current user
         inventory: {
           userId: userId,
         },
       },
-      // THIS IS THE MOST IMPORTANT PART: It attaches the master 'Item' details.
       include: {
         item: true,
       },
     });
 
     if (!inventoryItem) {
-      // Return 404 if the item doesn't exist or doesn't belong to the user
       return NextResponse.json(
         { message: "Inventory item not found or you do not have permission." },
         { status: 404 }
@@ -59,16 +55,15 @@ export async function GET(
   }
 }
 
-// You can also add PATCH and DELETE handlers here later if needed
-// to update or delete a single inventory item.
-// --- 👇 ADD THIS ENTIRE PATCH FUNCTION 👇 ---
-
 /**
  * PATCH handler to update an InventoryItem (e.g., its counted_units).
  */
 export async function PATCH(
   request: Request,
-  { params }: { params: { inventoryId: string; itemId: string } }
+  // FIXED: Removed explicit type annotation to allow for Promise<params>
+  context: {
+    params: Promise<{ inventoryId: string; itemId: string }>;
+  }
 ) {
   try {
     const session = await auth();
@@ -79,11 +74,9 @@ export async function PATCH(
       );
     }
     const userId = session.user.id;
-    const Params = await params;
-    const { itemId } = Params;
+    const itemId = (await context.params).itemId;
     const body = await request.json();
 
-    // The data to update, likely just the count
     const { counted_units } = body;
 
     if (typeof counted_units !== "number") {
@@ -93,13 +86,9 @@ export async function PATCH(
       );
     }
 
-    // Use a single 'update' call. Prisma will fail if the where clause doesn't find
-    // a matching record (i.e., wrong ID or inventory not owned by the user).
-    // This is more efficient and secure than fetching first.
     const updatedInventoryItem = await db.inventoryItem.update({
       where: {
         id: itemId,
-        // Enforce ownership by checking the relation
         inventory: {
           userId: userId,
         },
@@ -112,7 +101,6 @@ export async function PATCH(
     return NextResponse.json(updatedInventoryItem);
   } catch (error: unknown) {
     console.error("Failed to update inventory item:", error);
-    // Handle Prisma's "Record Not Found" error which also covers the authorization check
     if (
       error &&
       typeof error === "object" &&

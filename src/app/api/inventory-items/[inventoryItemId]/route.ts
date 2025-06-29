@@ -17,12 +17,13 @@ async function getUserIdFromSession() {
 // GET handler for a single InventoryItem
 export async function GET(
   request: Request,
-  { params }: { params: { inventoryItemId: string } }
+  context: {
+    params: Promise<{ inventoryItemId: string }>;
+  }
 ) {
-  const Params = await params;
   try {
     const userId = await getUserIdFromSession(); // Authenticate and get user ID
-    const inventoryItemId = Params.inventoryItemId;
+    const inventoryItemId = (await context.params).inventoryItemId;
 
     const inventoryItem = await db.inventoryItem.findUnique({
       where: {
@@ -73,12 +74,13 @@ export async function GET(
 // PATCH to update an existing InventoryItem
 export async function PATCH(
   request: Request,
-  { params }: { params: { inventoryItemId: string } }
+  context: {
+    params: Promise<{ inventoryItemId: string }>;
+  }
 ) {
   try {
     const userId = await getUserIdFromSession();
-    const Params = await params;
-    const inventoryItemId = Params.inventoryItemId;
+    const inventoryItemId = (await context.params).inventoryItemId;
     const body = await request.json(); // Expected: { counted_units?: number, calculated_weight?: number }
 
     // Find the inventoryItem and its associated inventory to ensure ownership
@@ -138,12 +140,13 @@ export async function PATCH(
 // DELETE an InventoryItem
 export async function DELETE(
   request: Request,
-  { params }: { params: { inventoryItemId: string } }
+  context: {
+    params: Promise<{ inventoryItemId: string }>;
+  }
 ) {
   try {
     const userId = await getUserIdFromSession();
-    const Params = await params;
-    const inventoryItemId = Params.inventoryItemId;
+    const inventoryItemId = (await context.params).inventoryItemId;
 
     const existingInventoryItem = await db.inventoryItem.findUnique({
       where: { id: inventoryItemId },

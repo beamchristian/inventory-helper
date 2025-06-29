@@ -18,12 +18,13 @@ async function getUserIdFromSession() {
 // GET handler to fetch all InventoryItems for a given inventoryId
 export async function GET(
   request: Request,
-  { params }: { params: { inventoryId: string } }
+  context: {
+    params: Promise<{ inventoryId: string }>;
+  }
 ) {
   try {
     const userId = await getUserIdFromSession(); // Authenticate and get user ID
-    const Params = await params;
-    const inventoryId = Params.inventoryId;
+    const inventoryId = (await context.params).inventoryId;
 
     if (!inventoryId) {
       return NextResponse.json(

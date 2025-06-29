@@ -7,18 +7,11 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db"; // Import the shared prisma client instance
 import { auth } from "@/lib/auth"; // Import your custom auth helper
 
-/**
- * Handles GET requests to fetch all InventoryItems for a specific Inventory.
- *
- * @param {Request} req - The incoming request object.
- * @param {object} context - The context containing route parameters.
- * @param {object} context.params - Next.js dynamic route parameters.
- * @param {string} context.params.inventoryId - The ID of the inventory to fetch items from.
- * @returns {Promise<NextResponse>} The response object with a list of InventoryItems.
- */
 export async function GET(
   req: Request,
-  { params }: { params: { inventoryId: string } }
+  context: {
+    params: Promise<{ inventoryId: string }>;
+  }
 ): Promise<NextResponse> {
   try {
     const session = await auth(); // Get the server-side session
@@ -26,9 +19,8 @@ export async function GET(
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-    const Params = await params;
 
-    const { inventoryId } = Params;
+    const inventoryId = (await context.params).inventoryId;
 
     if (!inventoryId) {
       return NextResponse.json(
@@ -83,19 +75,11 @@ export async function GET(
   }
 }
 
-/**
- * Handles POST requests to add an existing Item to a specific Inventory.
- * This creates a new InventoryItem record.
- *
- * @param {Request} req - The incoming request object.
- * @param {object} context - The context containing route parameters.
- * @param {object} context.params - Next.js dynamic route parameters.
- * @param {string} context.params.inventoryId - The ID of the inventory to add the item to.
- * @returns {Promise<NextResponse>} The response object.
- */
 export async function POST(
   req: Request,
-  { params }: { params: { inventoryId: string } }
+  context: {
+    params: Promise<{ inventoryId: string }>;
+  }
 ): Promise<NextResponse> {
   try {
     const session = await auth(); // Get the server-side session
@@ -103,8 +87,7 @@ export async function POST(
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-    const Params = await params;
-    const { inventoryId } = Params;
+    const inventoryId = (await context.params).inventoryId;
     const { item_id, counted_units } = await req.json();
 
     // Basic validation
@@ -174,16 +157,12 @@ export async function POST(
 
 /**
  * Handles DELETE requests to remove an item from a specific Inventory.
- *
- * @param {Request} req - The incoming request object.
- * @param {object} context - The context containing route parameters.
- * @param {object} context.params - Next.js dynamic route parameters.
- * @param {string} context.params.inventoryId - The ID of the inventory the item belongs to.
- * @returns {Promise<NextResponse>} The response object.
  */
 export async function DELETE(
   req: Request,
-  { params }: { params: { inventoryId: string } }
+  context: {
+    params: Promise<{ inventoryId: string }>;
+  }
 ): Promise<NextResponse> {
   try {
     const session = await auth();
@@ -191,8 +170,7 @@ export async function DELETE(
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-    const Params = await params;
-    const { inventoryId } = Params;
+    const inventoryId = (await context.params).inventoryId;
     const { inventoryItemId } = await req.json(); // Expected from the client
 
     if (!inventoryId || !inventoryItemId) {

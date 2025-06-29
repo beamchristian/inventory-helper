@@ -14,7 +14,9 @@ import { auth } from "@/lib/auth";
  */
 export async function POST(
   req: NextRequest,
-  { params }: { params: { inventoryId: string } }
+  context: {
+    params: Promise<{ inventoryId: string }>;
+  }
 ): Promise<NextResponse> {
   try {
     const session = await auth();
@@ -22,8 +24,7 @@ export async function POST(
     if (!session || !session.user || !session.user.id) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
-    const Params = await params;
-    const { inventoryId } = Params;
+    const inventoryId = (await context.params).inventoryId;
 
     if (!inventoryId) {
       return NextResponse.json(
