@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 
 /**
  * Handles POST requests to create a new Master Item.

@@ -1,7 +1,7 @@
 // src/app/api/inventories/[inventoryId]/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 
 // REFACTORED: Centralized error handler for this resource.
 function handleError(error: unknown): NextResponse {
@@ -39,6 +39,7 @@ export async function GET(
   request: Request,
   { params }: { params: { inventoryId: string } }
 ) {
+  const { inventoryId } = await params;
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -49,7 +50,7 @@ export async function GET(
     // REFACTORED: Single query for secure fetching.
     const inventory = await db.inventory.findUnique({
       where: {
-        id: params.inventoryId,
+        id: inventoryId,
         userId: userId, // Enforce ownership
       },
     });

@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db"; // Import the shared prisma client instance
-import { auth } from "@/auth"; // Import your custom auth helper
+import { auth } from "@/lib/auth"; // Import your custom auth helper
 
 /**
  * Handles GET requests to fetch all InventoryItems for a specific Inventory.

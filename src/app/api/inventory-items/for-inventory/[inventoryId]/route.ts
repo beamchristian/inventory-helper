@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db"; // Your Prisma client instance
-import { auth } from "@/auth"; // Your NextAuth.js server-side auth helper
+import { auth } from "@/lib/auth"; // Your NextAuth.js server-side auth helper
 
 // Helper to get userId securely on the server
 async function getUserIdFromSession() {

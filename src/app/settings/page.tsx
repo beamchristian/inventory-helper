@@ -49,8 +49,8 @@ type SortColumn =
   | "brand";
 
 export default function SettingsPage() {
-  const { data: sessionData, status } = useSession(); // Fixed: Destructure as sessionData
-  console.log(sessionData);
+  const { status } = useSession(); // Fixed: Destructure as sessionData
+
   const { data: items, isLoading, isError, error } = useItems();
   const addItemMutation = useAddItem(); // This is for adding master items
   const updateItemMutation = useUpdateItem();

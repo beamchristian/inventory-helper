@@ -34,8 +34,7 @@ const LoadingSpinner: React.FC = () => (
  * Assumes the API route handles user authorization.
  */
 const useInventoryDetails = (inventoryId: string | undefined) => {
-  const { data: sessionData, status } = useSession(); // Fixed: Destructure as sessionData
-  console.log(sessionData);
+  const { status } = useSession(); // Fixed: Destructure as sessionData
   return useQuery<Inventory>({
     queryKey: ["inventory", inventoryId],
     queryFn: async () => {
@@ -85,8 +84,8 @@ export default function InventoryDetailPage() {
 
   const inventoryId = params.inventoryId as string;
 
-  const { data: sessionData, status } = useSession(); // Fixed: Destructure as sessionData
-  console.log(sessionData);
+  const { status } = useSession(); // Fixed: Destructure as sessionData
+
   const showMessage = (
     message: string,
     type: "info" | "error" | "success" = "info"

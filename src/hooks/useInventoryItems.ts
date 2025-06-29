@@ -29,8 +29,8 @@ export const useInventoryItems = (
   sort?: SortParams
 ) => {
   // Fixed: Only destructure `status` if `data` (sessionData) itself is not used directly
-  const { data: sessionInfo, status } = useSession(); // Renamed to sessionInfo for clarity
-  console.log(sessionInfo);
+  const { status } = useSession(); // Renamed to sessionInfo for clarity
+
   return useQuery<CombinedInventoryItem[]>({
     queryKey: ["inventoryItems", inventoryId, sort],
     queryFn: async () => {

@@ -1,26 +1,19 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { auth } from "./auth";
+// src/middleware.ts
 
-const protectedRoutes = ["/middleware"];
+// The middleware itself is now imported from your main auth file
+export { auth as middleware } from "./lib/auth";
 
-export default async function middleware(request: NextRequest) {
-  const session = await auth();
-
-  const isProtected = protectedRoutes.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  );
-
-  if (!session && isProtected) {
-    const absoluteUrl = new URL("/", request.nextUrl.origin);
-    return NextResponse.redirect(absoluteUrl.toString());
-  }
-  return NextResponse.next();
-}
-
+// Optional: You can still use a matcher to specify which routes the middleware should run on.
+// This is often more performant than running it on every single request.
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+  ],
 };
-
-// This line is no longer needed with the JWT strategy and can be removed.
-// export const runtime = "nodejs";

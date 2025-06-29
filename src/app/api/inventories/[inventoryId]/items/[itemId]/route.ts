@@ -1,7 +1,7 @@
 // src/app/api/inventories/[inventoryId]/items/[itemId]/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 
 /**
  * GET handler to fetch a single InventoryItem by its ID,

@@ -1,15 +1,16 @@
 "use server";
 
-import { signIn, signOut } from "@/auth";
-import { AuthError } from "next-auth"; // Import the specific error type
-import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { signIn, signOut } from "@/lib/auth"; // Assuming this points to your auth.ts
+import { AuthError } from "next-auth";
 import { revalidatePath } from "next/cache";
 
-// Define the shape of the state your action will manage
+// 1. Update the state shape to include a success flag.
 export interface ActionState {
   error?: string;
+  success?: boolean;
 }
 
+// These actions can remain as they are if you use them elsewhere
 export const login = async (provider: string) => {
   await signIn(provider, { redirectTo: "/" });
   revalidatePath("/");
@@ -20,31 +21,24 @@ export const logout = async () => {
   revalidatePath("/");
 };
 
-// The signature is updated to accept the previous state and the form data
+// 2. Update the loginwithCreds function signature and logic.
+// It no longer needs prevState and will not handle redirection itself.
 export const loginwithCreds = async (
-  prevState: ActionState | undefined,
   formData: FormData
 ): Promise<ActionState> => {
-  // Basic validation
-  if (!formData.get("email") || !formData.get("password")) {
-    return { error: "Email and password are required." };
-  }
-
   try {
-    // signIn will throw a RedirectError on success, which we want to allow.
-    // It will also throw an AuthError on failure, which we handle.
+    // We pass the redirectTo: false option here. This is crucial.
+    // It tells NextAuth to return the result of the login attempt
+    // instead of throwing a redirect error.
     await signIn("credentials", {
       ...Object.fromEntries(formData),
-      redirectTo: "/",
+      redirect: false,
     });
-    // This part is normally not reached on success because signIn redirects.
-    return {};
-  } catch (error) {
-    // The redirect error should be re-thrown to be handled by Next.js
-    if (isRedirectError(error)) {
-      throw error;
-    }
 
+    // If signIn completes without throwing an error, login was successful.
+    return { success: true };
+  } catch (error) {
+    // We only handle authentication errors here.
     if (error instanceof AuthError) {
       switch (error.type) {
         case "CredentialsSignin":
@@ -53,8 +47,7 @@ export const loginwithCreds = async (
           return { error: "An unexpected authentication error occurred." };
       }
     }
-    // If the error is not an AuthError, it's unexpected, so we re-throw it
-    // to be caught by the nearest error boundary.
+    // For any other type of error, we re-throw it.
     throw error;
   }
 };

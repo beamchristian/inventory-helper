@@ -1,6 +1,6 @@
 // src/app/page.tsx
 import { redirect } from "next/navigation";
-import { auth } from "@/auth"; // Server-side authentication
+import { auth } from "@/lib/auth"; // Server-side authentication
 import InventoryClientPage from "@/components/InventoryClientPage"; // Import the new client component
 
 /**

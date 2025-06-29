@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 
 /**
  * Handles POST requests to add all available master items to a specific Inventory.

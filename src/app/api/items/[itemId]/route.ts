@@ -1,7 +1,7 @@
 // src/app/api/items/[itemId]/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 
 // REFACTORED: Centralized error handler to reduce repetition.
 function handleError(error: unknown): NextResponse {

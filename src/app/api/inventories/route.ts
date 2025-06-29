@@ -1,7 +1,7 @@
 // src/app/api/inventories/route.ts
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 
 async function getUserIdFromSession() {
   const session = await auth();
