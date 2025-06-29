@@ -1,3 +1,4 @@
+// src/components/PaginationControls.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -7,6 +8,8 @@ interface PaginationControlsProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  itemsPerPage: number;
+  onItemsPerPageChange: (value: number) => void;
   // Change props to accept React Nodes (JSX) instead of strings
   prevButtonContent?: React.ReactNode;
   nextButtonContent?: React.ReactNode;
@@ -17,6 +20,8 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
   currentPage,
   totalPages,
   onPageChange,
+  itemsPerPage,
+  onItemsPerPageChange,
   // Update the default props to be JSX
   prevButtonContent = <> &larr; Previous</>,
   nextButtonContent = <>Next &rarr; </>,
@@ -34,6 +39,7 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
       if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
         onPageChange(pageNum);
       } else {
+        // Reset to current page if input is invalid
         setPageNumberInput(String(currentPage));
       }
     }
@@ -51,12 +57,14 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
     }
   };
 
+  // Do not render the controls if there's only one page or less.
   if (totalPages <= 1) {
     return null;
   }
 
   return (
     <div className='mt-8 flex flex-col sm:flex-row justify-between items-center gap-4 pt-6'>
+      {/* Previous Button */}
       <button
         onClick={handlePreviousPage}
         disabled={currentPage === 1}
@@ -65,6 +73,7 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
         {prevButtonContent}
       </button>
 
+      {/* Page Info and Jumper */}
       <div className='flex items-center justify-center gap-2 text-lg font-medium text-foreground'>
         <span>{noun}</span>
         <input
@@ -78,6 +87,7 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
         <span className='text-text-muted'>of {totalPages}</span>
       </div>
 
+      {/* Next Button */}
       <button
         onClick={handleNextPage}
         disabled={currentPage === totalPages}
@@ -85,6 +95,27 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
       >
         {nextButtonContent}
       </button>
+
+      {/* Items per page selector - moved to the side for better layout */}
+      <div className='flex items-center gap-2'>
+        <label
+          htmlFor='itemsPerPage'
+          className='text-text-base text-sm font-medium'
+        >
+          Items/Page:
+        </label>
+        <select
+          id='itemsPerPage'
+          value={itemsPerPage}
+          onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
+          className='border border-border-base rounded py-1 px-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary'
+        >
+          <option value={5}>5</option>
+          <option value={10}>10</option>
+          <option value={20}>20</option>
+          <option value={50}>50</option>
+        </select>
+      </div>
     </div>
   );
 };

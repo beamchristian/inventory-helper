@@ -1,9 +1,26 @@
 // src/hooks/useItems.ts
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react"; // Import useSession for user ID
-import { Item } from "@/types"; // Adjust path if necessary
+import { useSession } from "next-auth/react";
+import { Item } from "@/types";
 
-// Helper to handle API responses
+// Define the shape of the paginated API response
+interface PaginatedItemsResponse {
+  data: Item[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+  };
+}
+
+// Define the props our hook will accept for pagination
+interface UseItemsProps {
+  page?: number;
+  limit?: number;
+}
+
+// --- HELPER FUNCTION ---
 const handleApiResponse = async (response: Response) => {
   if (!response.ok) {
     const errorData = await response
@@ -14,36 +31,53 @@ const handleApiResponse = async (response: Response) => {
   return response.json();
 };
 
+// --- HOOKS ---
+
 /**
- * useItems Hook
- * Fetches all items belonging to the authenticated user.
+ * useItems Hook (FOR PAGINATED DATA)
+ * Fetches a single page of master items. Used for the Settings page table.
  */
-export const useItems = () => {
-  const { data: session, status } = useSession(); // Get session to access user ID
-
-  return useQuery<Item[]>({
-    queryKey: ["items", session?.user?.id], // Include userId in queryKey for re-fetching on login/logout
+export const useItems = ({ page = 1, limit = 10 }: UseItemsProps = {}) => {
+  const { status } = useSession();
+  return useQuery<PaginatedItemsResponse>({
+    queryKey: ["items", { page, limit }],
     queryFn: async () => {
-      // Only fetch if authenticated
-      if (status !== "authenticated") {
-        throw new Error("Authentication required to fetch items.");
-      }
-
-      const response = await fetch("/api/items"); // Calls your new /api/items GET route
+      if (status !== "authenticated")
+        throw new Error("Authentication required.");
+      const response = await fetch(`/api/items?page=${page}&limit=${limit}`);
       return handleApiResponse(response);
     },
-    // Enable query only when authenticated
+    enabled: status === "authenticated",
+  });
+};
+
+/**
+ * useAllItems Hook (FOR NON-PAGINATED DATA)
+ * Fetches ALL master items. Used for dropdowns and lists where all options are needed.
+ */
+export const useAllItems = () => {
+  const { status } = useSession();
+  return useQuery<Item[]>({
+    // Returns a simple array of items
+    queryKey: ["items", "all"], // A different key to distinguish from paginated queries
+    queryFn: async () => {
+      if (status !== "authenticated")
+        throw new Error("Authentication required.");
+      // Calls the API with a flag to get all items
+      const response = await fetch(`/api/items?all=true`);
+      return handleApiResponse(response);
+    },
     enabled: status === "authenticated",
   });
 };
 
 /**
  * useAddItem Hook
- * Adds a new item for the authenticated user.
+ * Invalidate the general 'items' query key to force a refetch of any page.
  */
 export const useAddItem = () => {
   const queryClient = useQueryClient();
-  const { data: session } = useSession(); // Get session for user ID
+  const { data: session } = useSession();
 
   return useMutation<
     Item,
@@ -51,25 +85,18 @@ export const useAddItem = () => {
     Omit<Item, "id" | "created_at" | "updated_at" | "user_id">
   >({
     mutationFn: async (newItemData) => {
-      if (!session?.user?.id) {
-        throw new Error("User not authenticated.");
-      }
-
-      // Merge user_id with newItemData
+      if (!session?.user?.id) throw new Error("User not authenticated.");
       const itemWithUserId = { ...newItemData, user_id: session.user.id };
-
       const response = await fetch("/api/items", {
-        // Calls your new /api/items POST route
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(itemWithUserId),
       });
       return handleApiResponse(response);
     },
     onSuccess: () => {
-      // Invalidate the 'items' query to refetch the list after a new item is added
+      // This invalidates all queries that start with 'items',
+      // ensuring any viewed page is updated correctly.
       queryClient.invalidateQueries({ queryKey: ["items"] });
     },
   });
@@ -77,64 +104,44 @@ export const useAddItem = () => {
 
 /**
  * useUpdateItem Hook
- * Updates an existing item for the authenticated user.
+ * Invalidation logic remains the same.
  */
 export const useUpdateItem = () => {
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
-
   return useMutation<Item, Error, Item>({
-    // Expects the full Item object to update
     mutationFn: async (updatedItemData) => {
-      if (!session?.user?.id) {
-        throw new Error("User not authenticated.");
-      }
-      if (!updatedItemData.id) {
+      if (!updatedItemData.id)
         throw new Error("Item ID is required for update.");
-      }
-
       const response = await fetch(`/api/items/${updatedItemData.id}`, {
-        // Calls /api/items/[itemId] PATCH route
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedItemData),
       });
       return handleApiResponse(response);
     },
     onSuccess: () => {
-      // Update the cache for the specific item, and invalidate the list
       queryClient.invalidateQueries({ queryKey: ["items"] });
-      // Optionally, you can update the specific item in the cache if you need
-      // queryClient.setQueryData(["items", data.id], data);
     },
   });
 };
 
 /**
  * useDeleteItem Hook
- * Deletes an item for the authenticated user.
+ * Invalidation logic remains the same.
  */
 export const useDeleteItem = () => {
   const queryClient = useQueryClient();
-  const { data: session } = useSession();
-
   return useMutation<void, Error, string>({
-    // Expects item ID as a string
     mutationFn: async (itemId) => {
-      if (!session?.user?.id) {
-        throw new Error("User not authenticated.");
-      }
-
       const response = await fetch(`/api/items/${itemId}`, {
-        // Calls /api/items/[itemId] DELETE route
         method: "DELETE",
       });
-      return handleApiResponse(response); // Response might be empty or a message
+      // A successful DELETE might not return a body, so we handle that
+      if (!response.ok)
+        return Promise.reject(await handleApiResponse(response));
+      return;
     },
     onSuccess: () => {
-      // Invalidate the 'items' query to refetch the list after deletion
       queryClient.invalidateQueries({ queryKey: ["items"] });
     },
   });

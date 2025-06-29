@@ -3,7 +3,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react"; // 1. We still need useSession
+import { useSession } from "next-auth/react";
 
 import {
   useInventories,
@@ -12,6 +12,7 @@ import {
 } from "../hooks/useInventories";
 
 import { Inventory } from "../types";
+import { PaginationControls } from "./PaginationControls"; // Import the pagination component
 
 const LoadingSpinner: React.FC = () => (
   <div className='flex justify-center items-center h-20'>
@@ -21,19 +22,27 @@ const LoadingSpinner: React.FC = () => (
 
 const InventoryClientPage: React.FC = () => {
   const router = useRouter();
-  // 2. Get session status to control data fetching
   const { status } = useSession();
 
-  // 3. Conditionally enable the query based on authentication status.
-  //    This is the key to preventing data fetching for unauthenticated users.
+  // 1. Add state for pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(6); // e.g., 6 cards per page
+
+  // 2. Pass pagination state to the useInventories hook
   const {
-    data: inventories,
-    isLoading: isInventoriesLoading, // Renamed to avoid conflict
+    data: paginatedData, // Rename to avoid confusion
+    isLoading: isInventoriesLoading,
     isError,
     error,
   } = useInventories({
+    page: currentPage,
+    limit: itemsPerPage,
     enabled: status === "authenticated",
   });
+
+  // 3. Extract the inventories array and pagination details from the response
+  const inventories = paginatedData?.data;
+  const pagination = paginatedData?.pagination;
 
   const createInventoryMutation = useCreateInventory();
   const deleteInventoryMutation = useDeleteInventory();
@@ -43,7 +52,7 @@ const InventoryClientPage: React.FC = () => {
   const handleCreateInventory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newInventoryName.trim()) {
-      alert("Inventory name cannot be empty."); // Replace with a better notification
+      alert("Inventory name cannot be empty.");
       return;
     }
     try {
@@ -74,19 +83,20 @@ const InventoryClientPage: React.FC = () => {
     }
   };
 
-  // 4. Determine the overall loading state. We wait for BOTH the session check
-  //    and the data fetch (if it runs) to complete.
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value);
+    setCurrentPage(1); // Reset to first page
+  };
+
   const isLoading = status === "loading" || isInventoriesLoading;
 
   return (
     <div className='min-h-screen bg-background-base p-4'>
-      {/* ... your message box ... */}
       <header className='flex justify-center items-center mb-8 max-w-4xl mx-auto'>
         <h1 className='text-4xl font-bold text-text-base'>Your Inventories</h1>
       </header>
 
       <main className='max-w-4xl mx-auto'>
-        {/* Render the "Create" form only if the user is logged in */}
         {status === "authenticated" && (
           <div className='bg-background-surface p-6 rounded-lg shadow-md mb-8'>
             <h2 className='text-2xl font-semibold mb-4 text-text-base'>
@@ -116,7 +126,6 @@ const InventoryClientPage: React.FC = () => {
           <h2 className='text-2xl font-semibold mb-4 text-text-base'>
             Past Inventories
           </h2>
-          {/* 5. Handle all states gracefully without redirects */}
           {isLoading && <LoadingSpinner />}
 
           {status === "unauthenticated" && (
@@ -134,7 +143,7 @@ const InventoryClientPage: React.FC = () => {
           {status === "authenticated" &&
             !isLoading &&
             !isError &&
-            inventories?.length === 0 && (
+            (!inventories || inventories.length === 0) && ( // Check inventories array
               <p className='text-text-muted'>
                 No inventories found. Start a new one above!
               </p>
@@ -145,49 +154,61 @@ const InventoryClientPage: React.FC = () => {
             !isError &&
             inventories &&
             inventories.length > 0 && (
-              <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-                {inventories.map((inventory: Inventory) => (
-                  <div
-                    key={inventory.id}
-                    className='border border-border-base p-4 rounded-lg shadow-sm bg-background-base flex flex-col justify-between'
-                  >
-                    <div>
-                      <h3 className='text-xl font-semibold text-text-base mb-2'>
-                        {inventory.name}
-                      </h3>
-                      <p className='text-sm text-text-muted'>
-                        Status:{" "}
-                        <span className='capitalize font-medium'>
-                          {inventory.status}
-                        </span>
-                      </p>
-                      <p className='text-sm text-text-muted mb-4'>
-                        Created:{" "}
-                        {new Date(inventory.created_at).toLocaleDateString()}
-                      </p>
+              <>
+                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+                  {inventories.map((inventory: Inventory) => (
+                    <div
+                      key={inventory.id}
+                      className='border border-border-base p-4 rounded-lg shadow-sm bg-background-base flex flex-col justify-between'
+                    >
+                      <div>
+                        <h3 className='text-xl font-semibold text-text-base mb-2'>
+                          {inventory.name}
+                        </h3>
+                        <p className='text-sm text-text-muted'>
+                          Status:{" "}
+                          <span className='capitalize font-medium'>
+                            {inventory.status}
+                          </span>
+                        </p>
+                        <p className='text-sm text-text-muted mb-4'>
+                          Created:{" "}
+                          {new Date(inventory.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className='flex space-x-2 mt-4'>
+                        <button
+                          onClick={() =>
+                            router.push(`/inventories/${inventory.id}`)
+                          }
+                          className='flex-grow bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-3 rounded text-sm'
+                        >
+                          View/Resume
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleDeleteInventory(inventory.id, inventory.name)
+                          }
+                          disabled={deleteInventoryMutation.isPending}
+                          className='bg-error hover:bg-error/90 text-text-inverse font-bold py-2 px-3 rounded text-sm disabled:opacity-50'
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                    <div className='flex space-x-2 mt-4'>
-                      <button
-                        onClick={() =>
-                          router.push(`/inventories/${inventory.id}`)
-                        }
-                        className='flex-grow bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-3 rounded text-sm'
-                      >
-                        View/Resume
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleDeleteInventory(inventory.id, inventory.name)
-                        }
-                        disabled={deleteInventoryMutation.isPending}
-                        className='bg-error hover:bg-error/90 text-text-inverse font-bold py-2 px-3 rounded text-sm disabled:opacity-50'
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+
+                {/* Add Pagination Controls */}
+                <PaginationControls
+                  currentPage={currentPage}
+                  totalPages={pagination?.totalPages || 1}
+                  onPageChange={setCurrentPage}
+                  itemsPerPage={itemsPerPage}
+                  onItemsPerPageChange={handleItemsPerPageChange}
+                  noun='Page'
+                />
+              </>
             )}
         </div>
       </main>

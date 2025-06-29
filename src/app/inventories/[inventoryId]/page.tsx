@@ -1,3 +1,4 @@
+// src/app/inventories/[inventoryId]/page.tsx
 "use client"; // This page is a client component
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -5,7 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { Inventory, InventoryItem, Item } from "@/types";
-import { useItems } from "@/hooks/useItems";
+import { useAllItems, useItems } from "@/hooks/useItems";
 import {
   useInventoryItems,
   useAddInventoryItem,
@@ -82,11 +83,12 @@ export default function InventoryDetailPage() {
     error: inventoryError,
   } = useInventoryDetails(inventoryId);
   const {
-    data: allUserItems,
+    data: allUserItems, // This is now correctly typed as Item[]
     isLoading: isAllItemsLoading,
     isError: isAllItemsError,
     error: allItemsError,
-  } = useItems();
+  } = useAllItems();
+
   const {
     data: currentInventoryItems,
     isLoading: isCurrentItemsLoading,
@@ -242,10 +244,8 @@ export default function InventoryDetailPage() {
     }
   };
 
-  const handleItemsPerPageChange = (
-    event: React.ChangeEvent<HTMLSelectElement>
-  ) => {
-    setItemsPerPage(Number(event.target.value));
+  const handleItemsPerPageChange = (value: number) => {
+    setItemsPerPage(value);
     setCurrentPage(1);
   };
 
@@ -562,26 +562,8 @@ export default function InventoryDetailPage() {
             </p>
           ) : (
             <>
-              <div className='flex items-center justify-end mb-4'>
-                <label htmlFor='itemsPerPage' className='text-text-muted mr-2'>
-                  Items per page:
-                </label>
-                <select
-                  id='itemsPerPage'
-                  value={itemsPerPage}
-                  onChange={handleItemsPerPageChange}
-                  className='p-2 border border-border-base rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background-surface text-text-base'
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value={200}>200</option>
-                </select>
-              </div>
-
               {/* Header for Desktop View */}
-              <div className='hidden md:grid md:grid-cols-12 gap-4 bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider border-b border-border-base pb-2 px-4'>
+              <div className='hidden md:grid md:grid-cols-12 gap-4 bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider border-b border-border-base pt-5 pb-2 px-4'>
                 <div
                   className='col-span-3 cursor-pointer'
                   onClick={() => handleSort("name")}
@@ -710,6 +692,8 @@ export default function InventoryDetailPage() {
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage} // <-- FIXED: Pass state
+                onItemsPerPageChange={handleItemsPerPageChange} // <-- FIXED: Pass handler
               />
             </>
           )}

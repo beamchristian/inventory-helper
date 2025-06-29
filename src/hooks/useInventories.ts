@@ -7,24 +7,46 @@ import {
 } from "@tanstack/react-query";
 import { Inventory } from "../types"; // Adjust path if necessary
 
+// 1. Define the shape of the paginated API response
+interface PaginatedInventoriesResponse {
+  data: Inventory[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+  };
+}
+
+// 2. Define the props our hook will accept for pagination
+interface UseInventoriesProps {
+  page?: number;
+  limit?: number;
+  enabled?: boolean;
+}
 // Fetch all inventories for the logged-in user
-// 2. Modified the function to accept optional parameters
-export const useInventories = (
-  options?: Omit<UseQueryOptions<Inventory[]>, "queryKey" | "queryFn">
-) => {
-  return useQuery<Inventory[]>({
-    queryKey: ["inventories"],
+// 3. Refactor the useInventories hook
+export const useInventories = ({
+  page = 1,
+  limit = 10,
+  enabled = true,
+}: UseInventoriesProps) => {
+  return useQuery<PaginatedInventoriesResponse>({
+    // The queryKey is now unique for each page, which is crucial for caching
+    queryKey: ["inventories", { page, limit }],
     queryFn: async () => {
-      const response = await fetch("/api/inventories");
+      // Append page and limit to the fetch request
+      const response = await fetch(
+        `/api/inventories?page=${page}&limit=${limit}`
+      );
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to fetch inventories.");
       }
       return response.json();
     },
-    // 3. Spread the incoming options into the query.
-    // This allows passing 'enabled', 'onSuccess', etc., from the component.
-    ...options,
+    // The `enabled` flag is passed here, often controlled by session status
+    enabled: enabled,
   });
 };
 

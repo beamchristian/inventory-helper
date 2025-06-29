@@ -1,3 +1,4 @@
+// src/app/inventories/[inventoryId]/items/[itemId]/page.tsx
 "use client";
 
 import React, { useState, useCallback, useMemo } from "react";
@@ -282,6 +283,8 @@ export default function InventoryItemDetailPage() {
           currentPage={currentIndex + 1}
           totalPages={totalItems}
           onPageChange={(page) => navigateToItem(page - 1)}
+          itemsPerPage={1} // <-- FIXED: Added itemsPerPage prop
+          onItemsPerPageChange={() => {}} // <-- FIXED: Added dummy handler
           prevButtonContent={<>&larr; Previous Item</>}
           nextButtonContent={<>Next Item &rarr;</>}
           noun='Item'

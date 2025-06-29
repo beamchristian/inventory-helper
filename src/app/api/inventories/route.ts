@@ -1,5 +1,5 @@
 // src/app/api/inventories/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
 import { auth } from "@/lib/auth";
 
@@ -12,22 +12,48 @@ async function getUserIdFromSession() {
 }
 
 // GET all inventories for the authenticated user
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const userId = await getUserIdFromSession();
+    const { searchParams } = new URL(request.url);
 
-    const inventories = await db.inventory.findMany({
-      where: {
-        userId: userId,
-      },
-      orderBy: {
-        created_at: "desc",
+    // Get page and limit from query params, with defaults
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const skip = (page - 1) * limit;
+
+    // Use a transaction to get both the data and the total count efficiently
+    const [inventories, totalItems] = await db.$transaction([
+      db.inventory.findMany({
+        where: {
+          userId: userId,
+        },
+        orderBy: {
+          created_at: "desc",
+        },
+        skip: skip,
+        take: limit,
+      }),
+      db.inventory.count({
+        where: {
+          userId: userId,
+        },
+      }),
+    ]);
+
+    const totalPages = Math.ceil(totalItems / limit);
+
+    // Return a structured response with data and pagination info
+    return NextResponse.json({
+      data: inventories,
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        totalPages,
       },
     });
-
-    return NextResponse.json(inventories);
   } catch (error: unknown) {
-    // Changed 'any' to 'unknown'
     console.error("Error fetching user inventories:", error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";

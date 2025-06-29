@@ -1,7 +1,4 @@
-// src/app/api/items/route.ts
-// This API route handles GET and POST operations for all master Items.
-
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { db } from "@/lib/db/db";
 import { auth } from "@/lib/auth";
 
@@ -13,21 +10,44 @@ async function getUserIdFromSession() {
   return session.user.id;
 }
 
-// GET all master items for the authenticated user
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const userId = await getUserIdFromSession();
+    const { searchParams } = new URL(request.url);
 
-    const items = await db.item.findMany({
-      where: {
-        user_id: userId,
-      },
-      orderBy: {
-        name: "asc", // Order items by name by default
+    // Check if the request is for ALL items
+    if (searchParams.get("all") === "true") {
+      const allItems = await db.item.findMany({
+        where: { user_id: userId },
+        orderBy: { name: "asc" },
+      });
+      return NextResponse.json(allItems); // Return a simple array
+    }
+
+    // Otherwise, handle the paginated request
+    const page = parseInt(searchParams.get("page") || "1", 10);
+    const limit = parseInt(searchParams.get("limit") || "10", 10);
+    const skip = (page - 1) * limit;
+
+    const [items, totalItems] = await db.$transaction([
+      db.item.findMany({
+        where: { user_id: userId },
+        orderBy: { name: "asc" },
+        skip,
+        take: limit,
+      }),
+      db.item.count({ where: { user_id: userId } }),
+    ]);
+
+    return NextResponse.json({
+      data: items,
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
       },
     });
-
-    return NextResponse.json(items);
   } catch (error: unknown) {
     // Fixed: changed 'any' to 'unknown'
     console.error("Error fetching items:", error);
