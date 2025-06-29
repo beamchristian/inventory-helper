@@ -6,7 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { Inventory, InventoryItem, Item } from "@/types";
-import { useAllItems, useItems } from "@/hooks/useItems";
+import { useAllItems } from "@/hooks/useItems";
 import {
   useInventoryItems,
   useAddInventoryItem,

@@ -1,10 +1,5 @@
 // src/hooks/useInventories.ts
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  UseQueryOptions, // 1. Import the UseQueryOptions type
-} from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Inventory } from "../types"; // Adjust path if necessary
 
 // 1. Define the shape of the paginated API response
