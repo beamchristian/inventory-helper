@@ -64,6 +64,7 @@ export default {
           user.passwordHash
         );
         if (!isMatch) return null;
+        // eslint-disable-next-line unused-var
         const { passwordHash, ...userWithoutHash } = user;
         return userWithoutHash;
       },
