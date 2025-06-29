@@ -123,6 +123,16 @@ export default function SettingsPage() {
       return;
     }
 
+    // --- START: NEW UPC DUPLICATE CHECK ---
+    const newUpc = newItemForm.upc_number?.trim();
+
+    // Only perform the check if a UPC number was actually entered.
+    if (newUpc && items?.some((item) => item.upc_number === newUpc)) {
+      showMessage(`An item with the UPC "${newUpc}" already exists.`, "error");
+      return;
+    }
+    // --- END: NEW UPC DUPLICATE CHECK ---
+
     if (!newItemForm.name.trim()) {
       showMessage("Item Name is required.", "error");
       return;

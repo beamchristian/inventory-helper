@@ -92,6 +92,8 @@ model Item {
   brand                   String?
   created_at              DateTime        @default(now())
   inventoryItems          InventoryItem[]
+
+  @@unique([user_id, upc_number], name: "unique_user_item_upc")
 }
 
 // Your custom application tables, typically in the 'public' schema

@@ -1,25 +1,24 @@
-// src/app/inventories/[inventoryId]/page.tsx
 "use client"; // This page is a client component
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { useSession } from "next-auth/react"; // Import useSession for NextAuth.js
-import { Inventory, InventoryItem, Item } from "@/types"; // Adjust path if necessary
-import { useItems } from "@/hooks/useItems"; // Assumed to use new API routes for master items
+import { useSession } from "next-auth/react";
+import { Inventory, InventoryItem, Item } from "@/types";
+import { useItems } from "@/hooks/useItems";
 import {
   useInventoryItems,
   useAddInventoryItem,
   useDeleteInventoryItem,
   useUpdateInventoryItem,
-  useAddAllInventoryItems, // NEW: Import the new hook for adding all items
-} from "../../../hooks/useInventoryItems"; // Adjust path if necessary
-import { useUpdateInventory } from "../../../hooks/useInventories"; // Assumed to use new API routes
-import { sortForItemTypeOnly } from "@/lib/utils"; // Your utility function
+  useAddAllInventoryItems,
+} from "../../../hooks/useInventoryItems";
+import { useUpdateInventory } from "../../../hooks/useInventories";
+import { sortForItemTypeOnly } from "@/lib/utils";
+import { PaginationControls } from "@/components/PaginationControls";
 
 /**
  * LoadingSpinner Component
- * Displays a simple animated spinner.
  */
 const LoadingSpinner: React.FC = () => (
   <div className='flex justify-center items-center h-20'>
@@ -29,24 +28,16 @@ const LoadingSpinner: React.FC = () => (
 
 /**
  * useInventoryDetails Custom Hook
- * Fetches details for a specific inventory using a Next.js API route.
- * Replaces direct Supabase call with a standard fetch.
- * Assumes the API route handles user authorization.
  */
 const useInventoryDetails = (inventoryId: string | undefined) => {
-  const { status } = useSession(); // Fixed: Destructure as sessionData
+  const { status } = useSession();
   return useQuery<Inventory>({
     queryKey: ["inventory", inventoryId],
     queryFn: async () => {
-      if (!inventoryId) {
-        throw new Error("Inventory ID is missing.");
-      }
-      if (status !== "authenticated") {
+      if (!inventoryId) throw new Error("Inventory ID is missing.");
+      if (status !== "authenticated")
         throw new Error("Authentication required.");
-      }
-
       const response = await fetch(`/api/inventories/${inventoryId}`);
-
       if (!response.ok) {
         const errorData = await response
           .json()
@@ -70,43 +61,20 @@ type InventoryItemSortColumn =
   | "brand"
   | "item_type";
 
-// Helper type for the combined InventoryItem and Item relation (matches API include)
 type CombinedInventoryItem = InventoryItem & { item: Item };
 
-/**
- * InventoryDetailPage Component
- * Displays details of a specific inventory, including its items,
- * and allows for managing (adding, deleting) those items.
- */
 export default function InventoryDetailPage() {
   const router = useRouter();
   const params = useParams();
-
   const inventoryId = params.inventoryId as string;
+  const { status } = useSession();
 
-  const { status } = useSession(); // Fixed: Destructure as sessionData
+  const [sortColumn, setSortColumn] = useState<InventoryItemSortColumn>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [selectedItemIdToAdd, setSelectedItemIdToAdd] = useState<string>("");
 
-  const showMessage = (
-    message: string,
-    type: "info" | "error" | "success" = "info"
-  ) => {
-    const messageBox = document.getElementById("messageBox");
-    if (messageBox) {
-      messageBox.innerText = message;
-      messageBox.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg z-50 block `;
-      if (type === "error")
-        messageBox.classList.add("bg-red-500", "text-white");
-      else if (type === "success")
-        messageBox.classList.add("bg-green-500", "text-white");
-      else messageBox.classList.add("bg-blue-500", "text-white");
-      messageBox.style.display = "block";
-      setTimeout(() => {
-        if (messageBox) messageBox.style.display = "none";
-      }, 5000);
-    }
-  };
-
-  // --- Data Fetching and Mutations ---
   const {
     data: inventory,
     isLoading: isInventoryLoading,
@@ -118,13 +86,13 @@ export default function InventoryDetailPage() {
     isLoading: isAllItemsLoading,
     isError: isAllItemsError,
     error: allItemsError,
-  } = useItems(); // Fetches master items
+  } = useItems();
   const {
     data: currentInventoryItems,
     isLoading: isCurrentItemsLoading,
     isError: isCurrentItemsError,
     error: currentItemsError,
-  } = useInventoryItems(inventoryId); // Fetches InventoryItems for THIS inventory
+  } = useInventoryItems(inventoryId);
 
   const addInventoryItemMutation = useAddInventoryItem();
   const deleteInventoryItemMutation = useDeleteInventoryItem();
@@ -132,75 +100,18 @@ export default function InventoryDetailPage() {
   const updateInventoryItemMutation = useUpdateInventoryItem();
   const addAllInventoryItemsMutation = useAddAllInventoryItems();
 
-  // --- Component State ---
-  const [sortColumn, setSortColumn] = useState<InventoryItemSortColumn>("name");
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [selectedItemIdToAdd, setSelectedItemIdToAdd] = useState<string>("");
-
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/sign-in");
     }
   }, [status, router]);
 
-  const handleStartItemTypeCountMode = () => {
-    if (!currentInventoryItems || currentInventoryItems.length === 0) {
-      showMessage("There are no items in this inventory to count.", "info");
-      return;
-    }
-    const sortedForCount = sortForItemTypeOnly(currentInventoryItems);
-    const firstItemId = sortedForCount[0].id;
-    router.push(
-      `/inventories/${inventoryId}/items/${firstItemId}?sortMode=itemType`
-    );
-  };
-
-  const availableItemsToAdd = useMemo(() => {
-    if (!allUserItems || !currentInventoryItems) {
-      return [];
-    }
-
-    const currentItemIds = new Set(
-      currentInventoryItems.map((invItem) => invItem.item_id)
-    );
-
-    return allUserItems.filter((userItem) => !currentItemIds.has(userItem.id));
-  }, [allUserItems, currentInventoryItems]);
-
-  useEffect(() => {
-    if (availableItemsToAdd.length > 0) {
-      if (
-        !selectedItemIdToAdd ||
-        !availableItemsToAdd.some((item) => item.id === selectedItemIdToAdd)
-      ) {
-        setSelectedItemIdToAdd(availableItemsToAdd[0].id);
-      }
-    } else {
-      setSelectedItemIdToAdd("");
-    }
-  }, [availableItemsToAdd, selectedItemIdToAdd]);
-
-  const handleSort = (column: InventoryItemSortColumn) => {
-    setCurrentPage(1);
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
-  };
-
   const sortedInventoryItems = useMemo(() => {
     if (!currentInventoryItems) return [];
-
     const sortableItems = [...currentInventoryItems];
-
     sortableItems.sort((a, b) => {
       let aValue: string | number | null | undefined;
       let bValue: string | number | null | undefined;
-
       switch (sortColumn) {
         case "name":
           aValue = (a as CombinedInventoryItem).item.name;
@@ -238,22 +149,18 @@ export default function InventoryDetailPage() {
           aValue = (a as CombinedInventoryItem).item.name;
           bValue = (b as CombinedInventoryItem).item.name;
       }
-
       if (aValue === null || aValue === undefined)
         return sortDirection === "asc" ? 1 : -1;
       if (bValue === null || bValue === undefined)
         return sortDirection === "asc" ? -1 : 1;
-
       if (typeof aValue === "string" && typeof bValue === "string") {
         return sortDirection === "asc"
           ? aValue.localeCompare(bValue)
           : bValue.localeCompare(aValue);
       }
-
       if (typeof aValue === "number" && typeof bValue === "number") {
         return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
       }
-
       const valA = String(aValue);
       const valB = String(bValue);
       return sortDirection === "asc"
@@ -265,21 +172,73 @@ export default function InventoryDetailPage() {
 
   const totalItems = sortedInventoryItems.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
+
   const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return sortedInventoryItems.slice(startIndex, endIndex);
   }, [sortedInventoryItems, currentPage, itemsPerPage]);
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
+  const availableItemsToAdd = useMemo(() => {
+    if (!allUserItems || !currentInventoryItems) return [];
+    const currentItemIds = new Set(
+      currentInventoryItems.map((invItem) => invItem.item_id)
+    );
+    return allUserItems.filter((userItem) => !currentItemIds.has(userItem.id));
+  }, [allUserItems, currentInventoryItems]);
+
+  useEffect(() => {
+    if (availableItemsToAdd.length > 0) {
+      if (
+        !selectedItemIdToAdd ||
+        !availableItemsToAdd.some((item) => item.id === selectedItemIdToAdd)
+      ) {
+        setSelectedItemIdToAdd(availableItemsToAdd[0].id);
+      }
+    } else {
+      setSelectedItemIdToAdd("");
+    }
+  }, [availableItemsToAdd, selectedItemIdToAdd]);
+
+  const showMessage = (
+    message: string,
+    type: "info" | "error" | "success" = "info"
+  ) => {
+    const messageBox = document.getElementById("messageBox");
+    if (messageBox) {
+      messageBox.innerText = message;
+      messageBox.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg z-50 block `;
+      if (type === "error")
+        messageBox.classList.add("bg-red-500", "text-white");
+      else if (type === "success")
+        messageBox.classList.add("bg-green-500", "text-white");
+      else messageBox.classList.add("bg-blue-500", "text-white");
+      messageBox.style.display = "block";
+      setTimeout(() => {
+        if (messageBox) messageBox.style.display = "none";
+      }, 5000);
     }
   };
 
-  const handlePreviousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
+  const handleStartItemTypeCountMode = () => {
+    if (!currentInventoryItems || currentInventoryItems.length === 0) {
+      showMessage("There are no items in this inventory to count.", "info");
+      return;
+    }
+    const sortedForCount = sortForItemTypeOnly(currentInventoryItems);
+    const firstItemId = sortedForCount[0].id;
+    router.push(
+      `/inventories/${inventoryId}/items/${firstItemId}?sortMode=itemType`
+    );
+  };
+
+  const handleSort = (column: InventoryItemSortColumn) => {
+    setCurrentPage(1);
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
     }
   };
 
@@ -299,18 +258,16 @@ export default function InventoryDetailPage() {
       showMessage("Inventory ID is missing.", "error");
       return;
     }
-
     const isAlreadyAdded = (currentInventoryItems || []).some(
       (invItem) => invItem.item_id === selectedItemIdToAdd
     );
     if (isAlreadyAdded) {
       showMessage(
-        "This item has already been added to this inventory. Please select another item.",
+        "This item has already been added. Please select another item.",
         "info"
       );
       return;
     }
-
     try {
       await addInventoryItemMutation.mutateAsync({
         inventory_id: inventoryId,
@@ -324,14 +281,13 @@ export default function InventoryDetailPage() {
         errorMessage = err.message;
         if (
           errorMessage.includes("Unique constraint failed") ||
-          errorMessage.includes("P2002") ||
-          errorMessage.includes("already exists")
+          errorMessage.includes("P2002")
         ) {
           errorMessage =
-            "This item has already been added to this inventory. Please select another item.";
+            "This item has already been added. Please select another item.";
         }
       }
-      showMessage(`Error adding item to inventory: ${errorMessage}`, "error");
+      showMessage(`Error adding item: ${errorMessage}`, "error");
     }
   };
 
@@ -344,23 +300,16 @@ export default function InventoryDetailPage() {
       showMessage("All available items are already in this inventory.", "info");
       return;
     }
-
     const userConfirmed = window.confirm(
       `Are you sure you want to add all ${availableItemsToAdd.length} remaining items to this inventory?`
     );
-
-    if (!userConfirmed) {
-      return;
-    }
-
+    if (!userConfirmed) return;
     try {
       await addAllInventoryItemsMutation.mutateAsync(inventoryId);
       showMessage("All remaining items added to inventory!", "success");
     } catch (err) {
-      let errorMessage = "Unknown error adding all items.";
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      }
+      const errorMessage =
+        err instanceof Error ? err.message : "Unknown error adding all items.";
       showMessage(`Error adding all items: ${errorMessage}`, "error");
     }
   };
@@ -373,11 +322,9 @@ export default function InventoryDetailPage() {
       showMessage("Inventory ID is missing.", "error");
       return;
     }
-
     const userConfirmed = window.confirm(
       `Are you sure you want to remove "${itemName}" from this inventory?`
     );
-
     if (userConfirmed) {
       try {
         await deleteInventoryItemMutation.mutateAsync({
@@ -407,11 +354,7 @@ export default function InventoryDetailPage() {
     const newCount = prompt(
       `Enter new count for item (current: ${currentCount} ${itemUnitType}):`
     );
-    if (newCount === null) {
-      // User cancelled prompt
-      return;
-    }
-
+    if (newCount === null) return;
     const parsedCount = parseFloat(newCount);
     if (isNaN(parsedCount) || parsedCount < 0) {
       showMessage(
@@ -420,17 +363,15 @@ export default function InventoryDetailPage() {
       );
       return;
     }
-
     if (!inventoryId) {
       showMessage("Inventory ID is missing.", "error");
       return;
     }
-
     try {
       await updateInventoryItemMutation.mutateAsync({
         id: invItemId,
         counted_units: parsedCount,
-        inventory_id: inventoryId, // Pass inventory_id for invalidation
+        inventory_id: inventoryId,
       });
       showMessage("Item count updated successfully!", "success");
     } catch (err) {
@@ -452,11 +393,9 @@ export default function InventoryDetailPage() {
       showMessage("This inventory is already completed.", "info");
       return;
     }
-
     const userConfirmed = window.confirm(
       "Are you sure you want to complete this inventory? This action cannot be undone."
     );
-
     if (userConfirmed) {
       try {
         await updateInventoryMutation.mutateAsync({
@@ -478,62 +417,22 @@ export default function InventoryDetailPage() {
     }
   };
 
-  const isAnyLoading =
-    isInventoryLoading ||
-    isAllItemsLoading ||
-    isCurrentItemsLoading ||
-    status === "loading" ||
-    addAllInventoryItemsMutation.isPending;
-  const isAnyError =
-    isInventoryError ||
-    isAllItemsError ||
-    isCurrentItemsError ||
-    status === "unauthenticated";
-
-  if (isAnyLoading) {
+  if (isInventoryLoading || isAllItemsLoading || isCurrentItemsLoading) {
     return (
       <div className='min-h-screen flex items-center justify-center bg-background-base'>
         <LoadingSpinner />
       </div>
     );
   }
-
-  if (isAnyError) {
+  if (isInventoryError || isAllItemsError || isCurrentItemsError) {
     const errorMessage =
       inventoryError?.message ||
       allItemsError?.message ||
-      currentItemsError?.message ||
-      (status === "unauthenticated"
-        ? "You are not authenticated to view this page."
-        : "An unknown error occurred.");
-
-    if (
-      status === "unauthenticated" ||
-      errorMessage.includes("Authentication required.")
-    ) {
-      // The useEffect will handle the redirect.
-      // We can show the main loading spinner while we wait for the redirect.
-      return (
-        <div className='min-h-screen flex items-center justify-center bg-background-base'>
-          <LoadingSpinner />
-        </div>
-      );
-    }
-
-    const isNotFound = errorMessage?.includes("not found");
-
+      currentItemsError?.message;
     return (
       <div className='min-h-screen flex items-center justify-center bg-background-base'>
         <div className='text-center p-6 bg-background-surface rounded-lg shadow-md'>
-          <p className='text-error text-lg mb-4'>
-            Error loading data: {errorMessage}
-          </p>
-          {isNotFound && (
-            <p className='text-text-muted'>
-              This inventory might not exist or you don&apos;t have permission
-              to view it.
-            </p>
-          )}
+          <p className='text-error text-lg mb-4'>Error: {errorMessage}</p>
           <button
             onClick={() => router.push("/")}
             className='mt-4 bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded'
@@ -544,7 +443,6 @@ export default function InventoryDetailPage() {
       </div>
     );
   }
-
   if (!inventory) {
     return (
       <div className='min-h-screen flex items-center justify-center bg-background-base'>
@@ -563,12 +461,10 @@ export default function InventoryDetailPage() {
 
   return (
     <div className='container mx-auto p-4 max-w-5xl min-h-screen bg-background-base'>
-      {/* Custom Message Box for alerts */}
       <div
         id='messageBox'
         className='fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50 hidden'
       ></div>
-
       <header className='flex flex-col sm:flex-row justify-between items-center mb-8 gap-4'>
         <h1 className='text-3xl font-bold text-text-base text-center sm:text-left'>
           Inventory: {inventory.name}
@@ -591,7 +487,6 @@ export default function InventoryDetailPage() {
           </button>
         </div>
       </header>
-
       <main className='bg-background-surface p-4 sm:p-6 rounded-lg shadow-md'>
         <p className='text-lg text-text-base mb-2'>
           Status:{" "}
@@ -601,11 +496,9 @@ export default function InventoryDetailPage() {
           Created: {new Date(inventory.created_at).toLocaleDateString()} at{" "}
           {new Date(inventory.created_at).toLocaleTimeString()}
         </p>
-
         <h2 className='text-2xl font-semibold mt-8 mb-4 text-text-base'>
           Manage Items in This Inventory
         </h2>
-
         <div className='border border-border-base p-4 rounded bg-background-base mb-6 flex flex-wrap items-center gap-4'>
           <label
             htmlFor='selectItem'
@@ -661,10 +554,11 @@ export default function InventoryDetailPage() {
           </button>
         </div>
 
-        <div className='overflow-x-auto'>
-          {sortedInventoryItems && sortedInventoryItems.length === 0 ? (
+        {/* NEW RESPONSIVE LIST/TABLE */}
+        <div>
+          {sortedInventoryItems.length === 0 ? (
             <p className='text-text-muted text-center py-8'>
-              This inventory has no items yet. Add some from the dropdown above!
+              This inventory has no items yet.
             </p>
           ) : (
             <>
@@ -682,176 +576,141 @@ export default function InventoryDetailPage() {
                   <option value={25}>25</option>
                   <option value={50}>50</option>
                   <option value={100}>100</option>
+                  <option value={200}>200</option>
                 </select>
               </div>
 
-              <table className='min-w-full bg-background-surface border border-border-base'>
-                <thead>
-                  <tr className='bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider'>
-                    <th
-                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
-                      onClick={() => handleSort("name")}
-                    >
-                      Item Name
-                      {sortColumn === "name" &&
-                        (sortDirection === "asc" ? " ↑" : " ↓")}
-                    </th>
-                    <th
-                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
-                      onClick={() => handleSort("brand")}
-                    >
-                      Brand
-                      {sortColumn === "brand" &&
-                        (sortDirection === "asc" ? " ↑" : " ↓")}
-                    </th>
-                    <th
-                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
-                      onClick={() => handleSort("item_type")}
-                    >
-                      Item Type
-                      {sortColumn === "item_type" &&
-                        (sortDirection === "asc" ? " ↑" : " ↓")}
-                    </th>
-                    <th
-                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
-                      onClick={() => handleSort("unit_type")}
-                    >
-                      Unit Type
-                      {sortColumn === "unit_type" &&
-                        (sortDirection === "asc" ? " ↑" : " ↓")}
-                    </th>
-                    <th
-                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
-                      onClick={() => handleSort("upc_number")}
-                    >
-                      UPC Number
-                      {sortColumn === "upc_number" &&
-                        (sortDirection === "asc" ? " ↑" : " ↓")}
-                    </th>
-                    <th
-                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
-                      onClick={() => handleSort("counted_units")}
-                    >
-                      Count (Units)
-                      {sortColumn === "counted_units" &&
-                        (sortDirection === "asc" ? " ↑" : " ↓")}
-                    </th>
-                    <th
-                      className='py-3 px-4 border-b border-border-base cursor-pointer hover:bg-background-base/50'
-                      onClick={() => handleSort("calculated_weight")}
-                    >
-                      Total Weight (lbs)
-                      {sortColumn === "calculated_weight" &&
-                        (sortDirection === "asc" ? " ↑" : " ↓")}
-                    </th>
-                    <th className='py-3 px-4 border-b border-border-base text-center'>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedItems.map((invItem) => (
-                    <tr
-                      key={invItem.id}
-                      className='hover:bg-background-base/50'
-                    >
-                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
-                        {(invItem as CombinedInventoryItem).item?.name || "N/A"}{" "}
-                      </td>
-                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
-                        {(invItem as CombinedInventoryItem).item?.brand ||
-                          "N/A"}{" "}
-                      </td>
-                      <td className='py-2 px-4 border-b border-border-base capitalize text-text-base'>
-                        {(invItem as CombinedInventoryItem).item?.item_type ||
-                          "N/A"}{" "}
-                      </td>
-                      <td className='py-2 px-4 border-b border-border-base capitalize text-text-base'>
-                        {(invItem as CombinedInventoryItem).item?.unit_type ||
-                          "N/A"}
-                      </td>
-                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
-                        {(invItem as CombinedInventoryItem).item?.upc_number ||
-                          "N/A"}{" "}
-                      </td>
-                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
+              {/* Header for Desktop View */}
+              <div className='hidden md:grid md:grid-cols-12 gap-4 bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider border-b border-border-base pb-2 px-4'>
+                <div
+                  className='col-span-3 cursor-pointer'
+                  onClick={() => handleSort("name")}
+                >
+                  Name{" "}
+                  {sortColumn === "name" &&
+                    (sortDirection === "asc" ? "↑" : "↓")}
+                </div>
+                <div
+                  className='col-span-2 cursor-pointer'
+                  onClick={() => handleSort("brand")}
+                >
+                  Brand{" "}
+                  {sortColumn === "brand" &&
+                    (sortDirection === "asc" ? "↑" : "↓")}
+                </div>
+                <div
+                  className='col-span-2 cursor-pointer'
+                  onClick={() => handleSort("item_type")}
+                >
+                  Type{" "}
+                  {sortColumn === "item_type" &&
+                    (sortDirection === "asc" ? "↑" : "↓")}
+                </div>
+                <div
+                  className='col-span-2 cursor-pointer'
+                  onClick={() => handleSort("counted_units")}
+                >
+                  Count{" "}
+                  {sortColumn === "counted_units" &&
+                    (sortDirection === "asc" ? "↑" : "↓")}
+                </div>
+                <div className='col-span-3 text-center'>Actions</div>
+              </div>
+
+              {/* List of Items (Cards on mobile, Rows on desktop) */}
+              <div className='space-y-4 md:space-y-0'>
+                {paginatedItems.map((invItem: CombinedInventoryItem) => (
+                  <div
+                    key={invItem.id}
+                    className='p-4 border rounded-lg bg-background-surface md:grid md:grid-cols-12 md:gap-4 md:items-center md:p-0 md:py-3 md:border-0 md:border-b md:rounded-none'
+                  >
+                    {/* Column 1: Name */}
+                    <div className='flex justify-between items-center md:col-span-3 md:px-4'>
+                      <span className='font-bold text-sm text-text-muted md:hidden'>
+                        Name
+                      </span>
+                      <span className='text-right md:text-left'>
+                        {invItem.item?.name || "N/A"}
+                      </span>
+                    </div>
+
+                    {/* Column 2: Brand */}
+                    <div className='flex justify-between items-center border-t pt-2 mt-2 md:border-0 md:pt-0 md:mt-0 md:col-span-2 md:px-4'>
+                      <span className='font-bold text-sm text-text-muted md:hidden'>
+                        Brand
+                      </span>
+                      <span className='text-right md:text-left'>
+                        {invItem.item?.brand || "N/A"}
+                      </span>
+                    </div>
+
+                    {/* Column 3: Item Type */}
+                    <div className='flex justify-between items-center border-t pt-2 mt-2 md:border-0 md:pt-0 md:mt-0 md:col-span-2 md:px-4'>
+                      <span className='font-bold text-sm text-text-muted md:hidden'>
+                        Type
+                      </span>
+                      <span className='text-right md:text-left capitalize'>
+                        {invItem.item?.item_type || "N/A"}
+                      </span>
+                    </div>
+
+                    {/* Column 4: Count */}
+                    <div className='flex justify-between items-center border-t pt-2 mt-2 md:border-0 md:pt-0 md:mt-0 md:col-span-2 md:px-4'>
+                      <span className='font-bold text-sm text-text-muted md:hidden'>
+                        Count
+                      </span>
+                      <span className='text-right md:text-left'>
                         {invItem.counted_units} units
-                      </td>
-                      <td className='py-2 px-4 border-b border-border-base text-text-base'>
-                        {(invItem as CombinedInventoryItem).item?.unit_type ===
-                        "weight"
-                          ? `${
-                              (
-                                (invItem.counted_units || 0) *
-                                ((invItem as CombinedInventoryItem).item
-                                  ?.average_weight_per_unit || 0)
-                              ).toFixed(2) || "0.00"
-                            } lbs`
-                          : "-"}
-                      </td>
-                      <td className='py-2 px-4 border-b border-border-base text-center space-x-2 space-y-2'>
+                      </span>
+                    </div>
+
+                    {/* Column 5: Actions */}
+                    <div className='border-t pt-4 mt-4 md:border-0 md:pt-0 md:mt-0 md:col-span-3 md:px-4'>
+                      <div className='flex flex-col sm:flex-row items-center justify-center gap-2'>
                         <button
                           onClick={() =>
                             router.push(
                               `/inventories/${inventoryId}/items/${invItem.id}`
                             )
                           }
-                          className='bg-primary hover:bg-primary/90 text-text-inverse text-sm py-1 px-2 rounded'
+                          className='bg-primary hover:bg-primary/90 text-text-inverse text-sm py-1 px-2 rounded w-full sm:w-auto'
                         >
-                          View / Edit
+                          View/Edit
                         </button>
                         <button
                           onClick={() =>
                             handleUpdateCountedUnits(
                               invItem.id,
                               invItem.counted_units,
-                              (invItem as CombinedInventoryItem).item
-                                ?.unit_type || "units"
+                              invItem.item?.unit_type || "units"
                             )
                           }
-                          className='bg-accent hover:bg-accent/80 text-text-inverse text-sm py-1 px-2 rounded'
+                          className='bg-accent hover:bg-accent/80 text-text-inverse text-sm py-1 px-2 rounded w-full sm:w-auto'
                         >
-                          Update Count
+                          Update
                         </button>
                         <button
                           onClick={() =>
                             handleDeleteInventoryItem(
                               invItem.id,
-                              (invItem as CombinedInventoryItem).item?.name ||
-                                "Unknown Item"
+                              invItem.item?.name || "Unknown Item"
                             )
                           }
-                          className='bg-error hover:bg-error/90 text-text-inverse text-sm py-1 px-2 rounded'
+                          className='bg-error hover:bg-error/90 text-text-inverse text-sm py-1 px-2 rounded w-full sm:w-auto'
                         >
                           Remove
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-              {totalPages > 1 && (
-                <div className='mt-6 flex justify-between items-center px-4'>
-                  <button
-                    onClick={handlePreviousPage}
-                    disabled={currentPage === 1}
-                    className='bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
-                  >
-                    &larr; Previous
-                  </button>
-                  <span className='md:text-lg font-medium text-foreground'>
-                    {currentPage} / {totalPages}
-                  </span>
-                  <button
-                    onClick={handleNextPage}
-                    disabled={currentPage === totalPages}
-                    className='bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
-                  >
-                    Next &rarr;
-                  </button>
-                </div>
-              )}
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+              />
             </>
           )}
         </div>

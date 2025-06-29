@@ -39,6 +39,7 @@ export async function GET(
   request: Request,
   { params }: { params: { itemId: string } }
 ) {
+  const { itemId } = await params;
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -49,7 +50,7 @@ export async function GET(
     // REFACTORED: Use a single query to find the item ONLY if it belongs to the user.
     const item = await db.item.findUnique({
       where: {
-        id: params.itemId,
+        id: itemId,
         user_id: userId, // Combine the ownership check into the query
       },
     });
@@ -101,6 +102,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: { itemId: string } }
 ) {
+  const { itemId } = await params;
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -112,7 +114,7 @@ export async function DELETE(
     // operation that checks ownership and deletes in one step.
     await db.item.delete({
       where: {
-        id: params.itemId,
+        id: itemId,
         user_id: userId, // Enforce ownership
       },
     });
