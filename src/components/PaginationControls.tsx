@@ -1,4 +1,3 @@
-// src/components/PaginationControls.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -10,10 +9,10 @@ interface PaginationControlsProps {
   onPageChange: (page: number) => void;
   itemsPerPage: number;
   onItemsPerPageChange: (value: number) => void;
-  // Change props to accept React Nodes (JSX) instead of strings
   prevButtonContent?: React.ReactNode;
   nextButtonContent?: React.ReactNode;
   noun?: string;
+  showItemsPerPage?: boolean; // <-- ADDED: New prop to control visibility
 }
 
 export const PaginationControls: React.FC<PaginationControlsProps> = ({
@@ -22,10 +21,10 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
   onPageChange,
   itemsPerPage,
   onItemsPerPageChange,
-  // Update the default props to be JSX
   prevButtonContent = <> &larr; Previous</>,
   nextButtonContent = <>Next &rarr; </>,
   noun = "Page",
+  showItemsPerPage = true, // <-- ADDED: Default to true for backward compatibility
 }) => {
   const [pageNumberInput, setPageNumberInput] = useState(String(currentPage));
 
@@ -39,7 +38,6 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
       if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
         onPageChange(pageNum);
       } else {
-        // Reset to current page if input is invalid
         setPageNumberInput(String(currentPage));
       }
     }
@@ -57,7 +55,6 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
     }
   };
 
-  // Do not render the controls if there's only one page or less.
   if (totalPages <= 1) {
     return null;
   }
@@ -96,26 +93,28 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
         {nextButtonContent}
       </button>
 
-      {/* Items per page selector - moved to the side for better layout */}
-      <div className='flex items-center gap-2'>
-        <label
-          htmlFor='itemsPerPage'
-          className='text-text-base text-sm font-medium'
-        >
-          Items/Page:
-        </label>
-        <select
-          id='itemsPerPage'
-          value={itemsPerPage}
-          onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-          className='border border-border-base rounded py-1 px-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary'
-        >
-          <option value={5}>5</option>
-          <option value={10}>10</option>
-          <option value={20}>20</option>
-          <option value={50}>50</option>
-        </select>
-      </div>
+      {/* MODIFIED: Items per page selector is now conditional */}
+      {showItemsPerPage && (
+        <div className='flex items-center gap-2'>
+          <label
+            htmlFor='itemsPerPage'
+            className='text-text-base text-sm font-medium'
+          >
+            Items/Page:
+          </label>
+          <select
+            id='itemsPerPage'
+            value={itemsPerPage}
+            onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
+            className='border border-border-base rounded py-1 px-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary'
+          >
+            <option value={5}>5</option>
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+      )}
     </div>
   );
 };
