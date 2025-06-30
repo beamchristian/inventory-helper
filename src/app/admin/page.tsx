@@ -9,8 +9,9 @@ import {
   useCreateUser,
   useUpdateUserRole,
   useDeleteUser,
+  useCopyItems,
   AdminUser,
-  NewUserPayload, // Import the payload type
+  NewUserPayload,
 } from "@/hooks/useAdmin";
 
 const LoadingSpinner = () => (
@@ -24,6 +25,9 @@ const AdminPage = () => {
   const router = useRouter();
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
 
+  const [sourceUserId, setSourceUserId] = useState("");
+  const [targetUserId, setTargetUserId] = useState("");
+
   const {
     data: users,
     isLoading,
@@ -35,6 +39,7 @@ const AdminPage = () => {
   const createUserMutation = useCreateUser();
   const updateUserRoleMutation = useUpdateUserRole();
   const deleteUserMutation = useDeleteUser();
+  const copyItemsMutation = useCopyItems();
 
   useEffect(() => {
     if (status === "loading") {
@@ -56,19 +61,15 @@ const AdminPage = () => {
     );
   }
 
-  // FIXED: Manually construct the payload to ensure type safety.
   const handleCreateUser = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
-
     const newUserPayload: NewUserPayload = {
       name: formData.get("name") as string,
       email: formData.get("email") as string,
       password: formData.get("password") as string,
       role: formData.get("role") as Role,
     };
-
-    // Check if any value is missing (basic validation)
     if (
       !newUserPayload.name ||
       !newUserPayload.email ||
@@ -78,7 +79,6 @@ const AdminPage = () => {
       alert("Please fill out all fields.");
       return;
     }
-
     createUserMutation.mutate(newUserPayload, {
       onSuccess: () => setCreateModalOpen(false),
       onError: (error) => alert(`Error: ${error.message}`),
@@ -97,11 +97,111 @@ const AdminPage = () => {
     }
   };
 
+  const handleCopy = () => {
+    if (!sourceUserId || !targetUserId) {
+      alert("Please select both a source and a target user.");
+      return;
+    }
+    if (sourceUserId === targetUserId) {
+      alert("Source and target users cannot be the same.");
+      return;
+    }
+
+    const sourceUserName =
+      users?.find((u) => u.id === sourceUserId)?.name || "the source user";
+    const targetUserName =
+      users?.find((u) => u.id === targetUserId)?.name || "the target user";
+
+    if (
+      confirm(
+        `Are you sure you want to COPY all master items from ${sourceUserName} to ${targetUserName}? The source user will keep their items.`
+      )
+    ) {
+      copyItemsMutation.mutate(
+        { sourceUserId, targetUserId },
+        {
+          onSuccess: (data) => {
+            alert(`Success: ${data.message}`);
+            setSourceUserId("");
+            setTargetUserId("");
+          },
+          onError: (error) => {
+            alert(`Error: ${error.message}`);
+          },
+        }
+      );
+    }
+  };
+
   return (
     <div className='container mx-auto p-4 max-w-4xl'>
       <h1 className='text-3xl font-bold mb-6 text-foreground'>
         Admin Dashboard
       </h1>
+
+      <div className='bg-background-surface p-6 rounded-lg shadow-md mb-8'>
+        <h2 className='text-2xl font-semibold text-foreground mb-4'>
+          Copy Master Items
+        </h2>
+        <p className='text-sm text-text-muted mb-4'>
+          This action will create a copy of all master items from a source user
+          and assign them to a target user. The source user's items will not be
+          affected.
+        </p>
+        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 items-end'>
+          <div>
+            <label
+              htmlFor='sourceUser'
+              className='block text-text-base text-sm font-medium mb-1'
+            >
+              From User (Source)
+            </label>
+            <select
+              id='sourceUser'
+              value={sourceUserId}
+              onChange={(e) => setSourceUserId(e.target.value)}
+              className='w-full p-2 border border-border-base rounded bg-background text-foreground'
+            >
+              <option value=''>Select Source...</option>
+              {users?.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name} ({user.email})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor='targetUser'
+              className='block text-text-base text-sm font-medium mb-1'
+            >
+              To User (Target)
+            </label>
+            <select
+              id='targetUser'
+              value={targetUserId}
+              onChange={(e) => setTargetUserId(e.target.value)}
+              className='w-full p-2 border border-border-base rounded bg-background text-foreground'
+            >
+              <option value=''>Select Target...</option>
+              {users?.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name} ({user.email})
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={handleCopy}
+            disabled={
+              !sourceUserId || !targetUserId || copyItemsMutation.isPending
+            }
+            className='bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-4 rounded disabled:opacity-50'
+          >
+            {copyItemsMutation.isPending ? "Copying..." : "Copy Items"}
+          </button>
+        </div>
+      </div>
 
       <div className='bg-background-surface p-6 rounded-lg shadow-md'>
         <div className='flex justify-between items-center mb-4'>
@@ -144,7 +244,7 @@ const AdminPage = () => {
                         handleRoleChange(user.id, e.target.value as Role)
                       }
                       disabled={
-                        user.id === session.user.id ||
+                        user.id === session?.user.id ||
                         updateUserRoleMutation.isPending
                       }
                       className='p-1 border border-border-base rounded bg-background text-foreground'
@@ -160,7 +260,7 @@ const AdminPage = () => {
                     <button
                       onClick={() => handleDeleteUser(user.id)}
                       disabled={
-                        user.id === session.user.id ||
+                        user.id === session?.user.id ||
                         deleteUserMutation.isPending
                       }
                       className='text-error hover:text-error/80 text-sm disabled:opacity-50'
@@ -175,7 +275,6 @@ const AdminPage = () => {
         </div>
       </div>
 
-      {/* Create User Modal */}
       {isCreateModalOpen && (
         <div className='fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50'>
           <div className='bg-background-surface p-8 rounded-lg shadow-xl w-full max-w-md'>

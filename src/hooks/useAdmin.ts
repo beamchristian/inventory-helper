@@ -10,15 +10,12 @@ export type AdminUser = Pick<
   User,
   "id" | "name" | "email" | "role" | "createdAt"
 >;
-
-// FIXED: Define a specific type for the new user data
 export interface NewUserPayload {
   name: string;
   email: string;
   password: string;
   role: Role;
 }
-
 type UseAdminUsersOptions = Omit<
   UseQueryOptions<AdminUser[]>,
   "queryKey" | "queryFn"
@@ -39,11 +36,9 @@ export const useAdminUsers = (options?: UseAdminUsersOptions) => {
   });
 };
 
-// Hook to create a new user
 export const useCreateUser = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    // FIXED: Use the specific NewUserPayload type instead of 'any'
     mutationFn: async (userData: NewUserPayload) => {
       const response = await fetch("/api/admin/users", {
         method: "POST",
@@ -62,7 +57,6 @@ export const useCreateUser = () => {
   });
 };
 
-// Hook to update a user's role
 export const useUpdateUserRole = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -84,7 +78,6 @@ export const useUpdateUserRole = () => {
   });
 };
 
-// Hook to delete a user
 export const useDeleteUser = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -100,6 +93,36 @@ export const useDeleteUser = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["adminUsers"] });
+    },
+  });
+};
+
+/**
+ * Hook to COPY master items from one user to another.
+ */
+export const useCopyItems = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sourceUserId,
+      targetUserId,
+    }: {
+      sourceUserId: string;
+      targetUserId: string;
+    }) => {
+      const response = await fetch("/api/admin/transfer-items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceUserId, targetUserId }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to copy items");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
     },
   });
 };
