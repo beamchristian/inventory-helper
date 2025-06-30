@@ -1,4 +1,3 @@
-// src/app/inventories/[inventoryId]/page.tsx
 "use client"; // This page is a client component
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -83,7 +82,7 @@ export default function InventoryDetailPage() {
     error: inventoryError,
   } = useInventoryDetails(inventoryId);
   const {
-    data: allUserItems, // This is now correctly typed as Item[]
+    data: allUserItems,
     isLoading: isAllItemsLoading,
     isError: isAllItemsError,
     error: allItemsError,
@@ -460,7 +459,7 @@ export default function InventoryDetailPage() {
   }
 
   return (
-    <div className='container mx-auto p-4 max-w-5xl min-h-screen bg-background-base'>
+    <div className='container mx-auto p-4 max-w-6xl min-h-screen bg-background-base'>
       <div
         id='messageBox'
         className='fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50 hidden'
@@ -489,7 +488,7 @@ export default function InventoryDetailPage() {
       </header>
       <main className='bg-background-surface p-4 sm:p-6 rounded-lg shadow-md'>
         <p className='text-lg text-text-base mb-2'>
-          Status:{" "}
+          Status:
           <span className='capitalize font-medium'>{inventory.status}</span>
         </p>
         <p className='text-sm text-text-muted'>
@@ -554,7 +553,6 @@ export default function InventoryDetailPage() {
           </button>
         </div>
 
-        {/* NEW RESPONSIVE LIST/TABLE */}
         <div>
           {sortedInventoryItems.length === 0 ? (
             <p className='text-text-muted text-center py-8'>
@@ -562,127 +560,186 @@ export default function InventoryDetailPage() {
             </p>
           ) : (
             <>
-              {/* Header for Desktop View */}
-              <div className='hidden md:grid md:grid-cols-12 gap-4 bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider border-b border-border-base pt-5 pb-2 px-4'>
-                <div
-                  className='col-span-3 cursor-pointer'
-                  onClick={() => handleSort("name")}
-                >
-                  Name{" "}
-                  {sortColumn === "name" &&
-                    (sortDirection === "asc" ? "↑" : "↓")}
-                </div>
-                <div
-                  className='col-span-2 cursor-pointer'
-                  onClick={() => handleSort("brand")}
-                >
-                  Brand{" "}
-                  {sortColumn === "brand" &&
-                    (sortDirection === "asc" ? "↑" : "↓")}
-                </div>
-                <div
-                  className='col-span-2 cursor-pointer'
-                  onClick={() => handleSort("item_type")}
-                >
-                  Type{" "}
-                  {sortColumn === "item_type" &&
-                    (sortDirection === "asc" ? "↑" : "↓")}
-                </div>
-                <div
-                  className='col-span-2 cursor-pointer'
-                  onClick={() => handleSort("counted_units")}
-                >
-                  Count{" "}
-                  {sortColumn === "counted_units" &&
-                    (sortDirection === "asc" ? "↑" : "↓")}
-                </div>
-                <div className='col-span-3 text-center'>Actions</div>
+              {/* Desktop Table (hidden on mobile) */}
+              <div className='hidden md:block overflow-x-auto'>
+                <table className='min-w-full table-auto'>
+                  <thead className='bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider'>
+                    <tr>
+                      <th
+                        className='py-3 px-4 w-[30%] cursor-pointer'
+                        onClick={() => handleSort("name")}
+                      >
+                        Name{" "}
+                        {sortColumn === "name" &&
+                          (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
+                      <th
+                        className='py-3 px-4 w-[15%] cursor-pointer'
+                        onClick={() => handleSort("upc_number")}
+                      >
+                        UPC{" "}
+                        {sortColumn === "upc_number" &&
+                          (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
+                      <th
+                        className='py-3 px-4 w-[15%] cursor-pointer'
+                        onClick={() => handleSort("brand")}
+                      >
+                        Brand{" "}
+                        {sortColumn === "brand" &&
+                          (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
+                      <th
+                        className='py-3 px-4 w-[10%] cursor-pointer'
+                        onClick={() => handleSort("item_type")}
+                      >
+                        Type{" "}
+                        {sortColumn === "item_type" &&
+                          (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
+                      <th
+                        className='py-3 px-4 w-[10%] text-center cursor-pointer'
+                        onClick={() => handleSort("counted_units")}
+                      >
+                        Count{" "}
+                        {sortColumn === "counted_units" &&
+                          (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
+                      <th className='py-3 px-4 w-[20%] text-center'>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className='divide-y divide-border-base'>
+                    {paginatedItems.map((invItem: CombinedInventoryItem) => (
+                      <tr key={invItem.id} className='hover:bg-background-base'>
+                        <td className='py-3 px-4 text-foreground'>
+                          {invItem.item?.name || "N/A"}
+                        </td>
+                        <td className='py-3 px-4 text-text-muted'>
+                          {invItem.item?.upc_number || "N/A"}
+                        </td>
+                        <td className='py-3 px-4 text-text-muted'>
+                          {invItem.item?.brand || "N/A"}
+                        </td>
+                        <td className='py-3 px-4 text-text-muted capitalize'>
+                          {invItem.item?.item_type || "N/A"}
+                        </td>
+                        <td className='py-3 px-4 text-text-muted text-center'>
+                          {invItem.counted_units}
+                        </td>
+                        <td className='py-3 px-4 text-center'>
+                          <div className='flex justify-center items-center gap-2'>
+                            <button
+                              onClick={() =>
+                                router.push(
+                                  `/inventories/${inventoryId}/items/${invItem.id}`
+                                )
+                              }
+                              className='bg-primary hover:bg-primary/90 text-text-inverse text-xs py-1 px-2 rounded'
+                            >
+                              View
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleUpdateCountedUnits(
+                                  invItem.id,
+                                  invItem.counted_units,
+                                  invItem.item?.unit_type || "units"
+                                )
+                              }
+                              className='bg-accent hover:bg-accent/80 text-text-inverse text-xs py-1 px-2 rounded'
+                            >
+                              Update
+                            </button>
+                            <button
+                              onClick={() =>
+                                handleDeleteInventoryItem(
+                                  invItem.id,
+                                  invItem.item?.name || "Unknown"
+                                )
+                              }
+                              className='bg-error hover:bg-error/90 text-text-inverse text-xs py-1 px-2 rounded'
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
-              {/* List of Items (Cards on mobile, Rows on desktop) */}
-              <div className='space-y-4 md:space-y-0'>
+              {/* Mobile Card View (hidden on desktop) */}
+              <div className='md:hidden space-y-4'>
                 {paginatedItems.map((invItem: CombinedInventoryItem) => (
                   <div
                     key={invItem.id}
-                    className='p-4 border rounded-lg bg-background-surface md:grid md:grid-cols-12 md:gap-4 md:items-center md:p-0 md:py-3 md:border-0 md:border-b md:rounded-none'
+                    className='p-4 bg-background rounded-lg border border-border-base shadow-sm'
                   >
-                    {/* Column 1: Name */}
-                    <div className='flex justify-between items-center md:col-span-3 md:px-4'>
-                      <span className='font-bold text-sm text-text-muted md:hidden'>
-                        Name
-                      </span>
-                      <span className='text-right md:text-left'>
+                    <div className='flex justify-between items-center mb-2'>
+                      <h3 className='font-bold text-lg text-foreground'>
                         {invItem.item?.name || "N/A"}
-                      </span>
-                    </div>
-
-                    {/* Column 2: Brand */}
-                    <div className='flex justify-between items-center border-t pt-2 mt-2 md:border-0 md:pt-0 md:mt-0 md:col-span-2 md:px-4'>
-                      <span className='font-bold text-sm text-text-muted md:hidden'>
-                        Brand
-                      </span>
-                      <span className='text-right md:text-left'>
+                      </h3>
+                      <p className='text-sm text-text-muted'>
                         {invItem.item?.brand || "N/A"}
-                      </span>
+                      </p>
                     </div>
-
-                    {/* Column 3: Item Type */}
-                    <div className='flex justify-between items-center border-t pt-2 mt-2 md:border-0 md:pt-0 md:mt-0 md:col-span-2 md:px-4'>
-                      <span className='font-bold text-sm text-text-muted md:hidden'>
-                        Type
-                      </span>
-                      <span className='text-right md:text-left capitalize'>
-                        {invItem.item?.item_type || "N/A"}
-                      </span>
-                    </div>
-
-                    {/* Column 4: Count */}
-                    <div className='flex justify-between items-center border-t pt-2 mt-2 md:border-0 md:pt-0 md:mt-0 md:col-span-2 md:px-4'>
-                      <span className='font-bold text-sm text-text-muted md:hidden'>
-                        Count
-                      </span>
-                      <span className='text-right md:text-left'>
-                        {invItem.counted_units} units
-                      </span>
-                    </div>
-
-                    {/* Column 5: Actions */}
-                    <div className='border-t pt-4 mt-4 md:border-0 md:pt-0 md:mt-0 md:col-span-3 md:px-4'>
-                      <div className='flex flex-col sm:flex-row items-center justify-center gap-2'>
-                        <button
-                          onClick={() =>
-                            router.push(
-                              `/inventories/${inventoryId}/items/${invItem.id}`
-                            )
-                          }
-                          className='bg-primary hover:bg-primary/90 text-text-inverse text-sm py-1 px-2 rounded w-full sm:w-auto'
-                        >
-                          View/Edit
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleUpdateCountedUnits(
-                              invItem.id,
-                              invItem.counted_units,
-                              invItem.item?.unit_type || "units"
-                            )
-                          }
-                          className='bg-accent hover:bg-accent/80 text-text-inverse text-sm py-1 px-2 rounded w-full sm:w-auto'
-                        >
-                          Update
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleDeleteInventoryItem(
-                              invItem.id,
-                              invItem.item?.name || "Unknown Item"
-                            )
-                          }
-                          className='bg-error hover:bg-error/90 text-text-inverse text-sm py-1 px-2 rounded w-full sm:w-auto'
-                        >
-                          Remove
-                        </button>
+                    <div className='space-y-2 text-sm'>
+                      <div className='flex justify-between'>
+                        <span className='font-semibold text-text-muted'>
+                          UPC:
+                        </span>{" "}
+                        <span>{invItem.item?.upc_number || "N/A"}</span>
                       </div>
+                      <div className='flex justify-between'>
+                        <span className='font-semibold text-text-muted'>
+                          Type:
+                        </span>{" "}
+                        <span className='capitalize'>
+                          {invItem.item?.item_type || "N/A"}
+                        </span>
+                      </div>
+                      <div className='flex justify-between'>
+                        <span className='font-semibold text-text-muted'>
+                          Count:
+                        </span>{" "}
+                        <span>{invItem.counted_units}</span>
+                      </div>
+                    </div>
+                    <div className='flex justify-end gap-2 mt-4 pt-3 border-t border-border-base'>
+                      <button
+                        onClick={() =>
+                          router.push(
+                            `/inventories/${inventoryId}/items/${invItem.id}`
+                          )
+                        }
+                        className='bg-primary hover:bg-primary/90 text-text-inverse text-xs py-1 px-2 rounded'
+                      >
+                        View/Edit
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleUpdateCountedUnits(
+                            invItem.id,
+                            invItem.counted_units,
+                            invItem.item?.unit_type || "units"
+                          )
+                        }
+                        className='bg-accent hover:bg-accent/80 text-text-inverse text-xs py-1 px-2 rounded'
+                      >
+                        Update
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleDeleteInventoryItem(
+                            invItem.id,
+                            invItem.item?.name || "Unknown"
+                          )
+                        }
+                        className='bg-error hover:bg-error/90 text-text-inverse text-xs py-1 px-2 rounded'
+                      >
+                        Remove
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -692,8 +749,8 @@ export default function InventoryDetailPage() {
                 currentPage={currentPage}
                 totalPages={totalPages}
                 onPageChange={setCurrentPage}
-                itemsPerPage={itemsPerPage} // <-- FIXED: Pass state
-                onItemsPerPageChange={handleItemsPerPageChange} // <-- FIXED: Pass handler
+                itemsPerPage={itemsPerPage}
+                onItemsPerPageChange={handleItemsPerPageChange}
               />
             </>
           )}

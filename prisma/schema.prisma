@@ -19,6 +19,7 @@ datasource db {
 
 // Custom enum for your application, lives in 'public' schema
 enum Role {
+  ADMIN
   MANAGER
   TEAM_MEMBER
 }

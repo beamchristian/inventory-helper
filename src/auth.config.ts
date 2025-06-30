@@ -1,54 +1,50 @@
-// src/auth.config.ts
-
 import type { NextAuthConfig } from "next-auth";
 import Github from "next-auth/providers/github";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db/db";
+import { Role } from "@prisma/client"; // Import the Role enum
 
 export default {
-  // Add the sign-in page route. This is where users will be redirected if they
-  // try to access a protected page without being logged in.
   pages: {
     signIn: "/sign-in",
   },
   session: { strategy: "jwt" },
   callbacks: {
-    // THIS IS THE NEW PART
-    // The 'authorized' callback is where you protect your routes.
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      // The homepage ('/') is a protected route in your app.
       const isProtectedRoute = nextUrl.pathname.startsWith("/");
 
       if (isProtectedRoute) {
-        if (isLoggedIn) return true; // User is logged in, allow access.
-        return false; // User is not logged in, redirect to /sign-in.
+        if (isLoggedIn) return true;
+        return false;
       } else if (isLoggedIn) {
-        // If a logged-in user tries to visit the sign-in page, redirect them to the homepage.
-        // This prevents them from seeing the login form again.
         return Response.redirect(new URL("/", nextUrl));
       }
-
-      // Allow access to all other routes (like /sign-in for non-logged-in users)
       return true;
     },
-    // Keep your existing jwt and session callbacks
+
+    // --- MODIFIED JWT CALLBACK ---
     async jwt({ token, user }) {
       if (user) {
+        // When the user signs in, attach their id AND role to the token.
         token.id = user.id;
+        token.role = user.role; // <-- ADD THIS LINE
       }
       return token;
     },
+
+    // --- MODIFIED SESSION CALLBACK ---
     async session({ session, token }) {
+      // The token now has the id and role. Pass them to the session object.
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.role = token.role as Role; // <-- ADD THIS LINE
       }
       return session;
     },
   },
   providers: [
-    // ... all your providers (Github, Credentials) remain here ...
     Github({
       clientId: process.env.AUTH_GITHUB_ID,
       clientSecret: process.env.AUTH_GITHUB_SECRET,
@@ -58,16 +54,19 @@ export default {
         if (!credentials?.email || !credentials.password) return null;
         const email = credentials.email as string;
         const user = await db.user.findUnique({ where: { email } });
+
         if (!user || !user.passwordHash) return null;
+
         const isMatch = await bcrypt.compare(
           credentials.password as string,
           user.passwordHash
         );
-        if (!isMatch) return null;
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { passwordHash, ...userWithoutHash } = user;
 
-        return userWithoutHash;
+        // On successful password match, return the full user object.
+        // The 'user' object passed to the jwt callback will now contain the role.
+        if (isMatch) return user;
+
+        return null;
       },
     }),
   ],

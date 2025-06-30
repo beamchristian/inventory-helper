@@ -1,3 +1,4 @@
+// src/actions/auth.ts
 "use server";
 
 import { signIn, signOut } from "@/lib/auth"; // Assuming this points to your auth.ts

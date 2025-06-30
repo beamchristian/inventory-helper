@@ -49,6 +49,9 @@ export default function Header() {
   const userIdentifier = data?.user?.name || data?.user?.email;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Check if the user is an admin
+  const isAdmin = data?.user?.role === "ADMIN";
+
   return (
     <header className='bg-primary text-primary-foreground shadow-md relative'>
       <div className='container mx-auto flex justify-between items-center p-4'>
@@ -69,6 +72,15 @@ export default function Header() {
               >
                 Settings
               </Link>
+              {/* --- ADDED: Admin link for desktop --- */}
+              {isAdmin && (
+                <Link
+                  href='/admin'
+                  className='font-semibold text-accent-foreground hover:text-white/90 transition-colors'
+                >
+                  Admin
+                </Link>
+              )}
               {userIdentifier && (
                 <span
                   className='font-semibold truncate max-w-40'
@@ -132,6 +144,16 @@ export default function Header() {
             >
               Settings
             </Link>
+            {/* --- ADDED: Admin link for mobile --- */}
+            {isAdmin && (
+              <Link
+                href='/admin'
+                className='font-semibold text-accent-foreground hover:text-white/90 transition-colors w-full'
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Admin
+              </Link>
+            )}
             <div className='border-t border-primary-foreground/20 w-full my-2'></div>
             {userIdentifier && (
               <span
