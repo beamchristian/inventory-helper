@@ -145,8 +145,8 @@ const AdminPage = () => {
         </h2>
         <p className='text-sm text-text-muted mb-4'>
           This action will create a copy of all master items from a source user
-          and assign them to a target user. The source user's items will not be
-          affected.
+          and assign them to a target user. The source user&apos;s items will
+          not be affected.
         </p>
         <div className='grid grid-cols-1 md:grid-cols-3 gap-4 items-end'>
           <div>
