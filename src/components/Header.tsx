@@ -250,9 +250,6 @@ export default function Header() {
                 <p className='text-sm'>Install App</p>
                 <InstallAppControl />
               </div>
-              <div className='text-center'>
-                <p className='text-sm'>Notifications</p>
-              </div>
             </div>
             <div className='border-t border-primary-foreground/20 w-full my-2'></div>
             {userIdentifier && (
