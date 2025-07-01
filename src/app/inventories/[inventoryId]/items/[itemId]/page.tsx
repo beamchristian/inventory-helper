@@ -87,7 +87,8 @@ export default function InventoryItemDetailPage() {
     const sortableItems = [...unentered];
 
     sortableItems.sort((a, b) => {
-      let aValue: any, bValue: any;
+      let aValue: string | number | null | undefined;
+      let bValue: string | number | null | undefined;
       switch (sortColumn) {
         case "name":
           aValue = a.item.name;
