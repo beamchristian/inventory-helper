@@ -6,13 +6,18 @@ import Link from "next/link";
 import Image from "next/image"; // Import the Next.js Image component
 import { Button } from "@/components/ui/button";
 
-// ** InstallAppControl (Corrected for ESLint) **
+// ** InstallAppControl (With Installed Check) **
 function InstallAppControl() {
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
   const [isIOS, setIsIOS] = useState(false);
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
+  // 1. Add new state to track if the app is already installed
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
+    // 2. Check the display mode when the component mounts
+    setIsStandalone(window.matchMedia("(display-mode: standalone)").matches);
+
     setIsIOS(/iPhone|iPad|iPod/.test(navigator.userAgent));
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -33,7 +38,6 @@ function InstallAppControl() {
       return;
     }
     if (deferredPrompt) {
-      // FIX: Added a descriptive comment for the TS error
       // @ts-expect-error - prompt() is a non-standard property on the Event type
       deferredPrompt.prompt();
       // @ts-expect-error - userChoice is a non-standard property on the Event type
@@ -42,6 +46,18 @@ function InstallAppControl() {
     }
   };
 
+  // 3. If the app is installed, show a success message and stop.
+  if (isStandalone) {
+    return (
+      <div className='flex flex-col items-center text-emerald-500'>
+        <span className='text-2xl' title='App is installed'>
+          ✅
+        </span>
+      </div>
+    );
+  }
+
+  // The rest of the logic remains the same
   if (!isIOS && !deferredPrompt) {
     return null;
   }
@@ -63,9 +79,7 @@ function InstallAppControl() {
           </h3>
           <ol className='list-decimal list-inside text-sm space-y-2'>
             <li>
-              {/* FIX: Escaped the apostrophe */}
               Tap the <span className='font-bold'>Share</span> button
-              {/* FIX: Replaced <img> with next/image <Image> */}
               <Image
                 src='/icons/ios-share.png'
                 alt='iOS Share Icon'
@@ -76,10 +90,8 @@ function InstallAppControl() {
               in your browser&apos;s menu.
             </li>
             <li>
-              {/* FIX: Escaped the apostrophes */}
               Scroll down and tap on{" "}
               <span className='font-bold'>&apos;Add to Home Screen&apos;</span>
-              {/* FIX: Replaced <img> with next/image <Image> */}
               <Image
                 src='/icons/ios-add.png'
                 alt='iOS Add to Home Screen Icon'
