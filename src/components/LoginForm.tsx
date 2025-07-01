@@ -78,12 +78,13 @@ function LoginForm() {
             />
           </div>
 
-          {/* NEW: Add the HCaptcha component and the hidden input */}
-          <HCaptcha
-            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY!}
-            onVerify={setCaptchaToken}
-            onExpire={() => setCaptchaToken(null)}
-          />
+          <div className='flex justify-center'>
+            <HCaptcha
+              sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY!}
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken(null)}
+            />
+          </div>
           <input type='hidden' name='captchaToken' value={captchaToken || ""} />
 
           {error && <p className='text-sm text-error'>{error}</p>}
