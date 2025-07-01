@@ -16,6 +16,18 @@ const pwaConfig = withPWA({
   // sw: 'service-worker.js',
 });
 
+// This is the Content Security Policy string.
+// It allows your own domain ('self'), and the required hCaptcha domains.
+const ContentSecurityPolicy = `
+  default-src 'self';
+  script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.hcaptcha.com https://*.hcaptcha.com;
+  style-src 'self' 'unsafe-inline' https://*.hcaptcha.com;
+  connect-src 'self' https://*.hcaptcha.com;
+  frame-src 'self' https://*.hcaptcha.com;
+  font-src 'self' data:;
+  img-src 'self' data:;
+`;
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -50,6 +62,15 @@ const nextConfig: NextConfig = {
           {
             key: "Content-Security-Policy",
             value: "default-src 'self'; script-src 'self'",
+          },
+        ],
+      },
+      {
+        source: "/:path*", // Apply these headers to all routes
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: ContentSecurityPolicy.replace(/\s{2,}/g, " ").trim(),
           },
         ],
       },
