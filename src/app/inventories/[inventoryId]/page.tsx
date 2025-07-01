@@ -168,7 +168,6 @@ export default function InventoryDetailPage() {
     return { unenteredItems: unentered, enteredItems: entered };
   }, [currentInventoryItems, sortColumn, sortDirection]);
 
-  // --- RESTORED LOGIC: START ---
   const totalItems = unenteredItems.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
@@ -198,7 +197,6 @@ export default function InventoryDetailPage() {
       setSelectedItemIdToAdd("");
     }
   }, [availableItemsToAdd, selectedItemIdToAdd]);
-  // --- RESTORED LOGIC: END ---
 
   const showMessage = (
     message: string,
@@ -216,8 +214,31 @@ export default function InventoryDetailPage() {
       messageBox.style.display = "block";
       setTimeout(() => {
         if (messageBox) messageBox.style.display = "none";
-      }, 5000);
+      }, 3000);
     }
+  };
+
+  const handleCopyValue = (invItem: CombinedInventoryItem) => {
+    let valueToCopy: string;
+
+    if (invItem.item?.unit_type === "weight") {
+      valueToCopy = (
+        (invItem.counted_units || 0) *
+        (invItem.item?.average_weight_per_unit || 0)
+      ).toFixed(2);
+    } else {
+      valueToCopy = (invItem.counted_units || 0).toString();
+    }
+
+    navigator.clipboard.writeText(valueToCopy).then(
+      () => {
+        showMessage(`Copied "${valueToCopy}" to clipboard!`, "success");
+      },
+      (err) => {
+        showMessage("Failed to copy value.", "error");
+        console.error("Clipboard copy failed: ", err);
+      }
+    );
   };
 
   const handleSort = (column: InventoryItemSortColumn) => {
@@ -481,6 +502,7 @@ export default function InventoryDetailPage() {
           </button>
         </div>
       </header>
+
       <main className='bg-background-surface p-4 sm:p-6 rounded-lg shadow-md'>
         <p className='text-lg text-text-base mb-2'>
           Status:
@@ -610,7 +632,7 @@ export default function InventoryDetailPage() {
                         {sortColumn === "calculated_weight" &&
                           (sortDirection === "asc" ? "↑" : "↓")}
                       </th>
-                      <th className='py-3 px-4 w-[15%] text-center'>Actions</th>
+                      <th className='py-3 px-4 w-[20%] text-center'>Actions</th>
                     </tr>
                   </thead>
                   <tbody className='divide-y divide-border-base'>
@@ -629,7 +651,7 @@ export default function InventoryDetailPage() {
                           <button
                             onClick={() =>
                               router.push(
-                                `/inventories/${inventoryId}/items/${invItem.id}`
+                                `/inventories/${inventoryId}/items/${invItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
                               )
                             }
                           >
@@ -649,20 +671,24 @@ export default function InventoryDetailPage() {
                           {invItem.counted_units}
                         </td>
                         <td className='py-3 px-4 text-text-muted text-center'>
-                          {invItem.item?.unit_type === "weight" ? (
-                            <>
-                              {(
+                          {invItem.item?.unit_type === "weight"
+                            ? `${(
                                 (invItem.counted_units || 0) *
                                 (invItem.item?.average_weight_per_unit || 0)
-                              ).toFixed(2)}{" "}
-                              lbs
-                            </>
-                          ) : (
-                            "N/A"
-                          )}
+                              ).toFixed(2)} lbs`
+                            : "N/A"}
                         </td>
                         <td className='py-3 px-4 text-center'>
                           <div className='flex justify-center items-center gap-2'>
+                            {invItem.counted_units > 0 && (
+                              <button
+                                onClick={() => handleCopyValue(invItem)}
+                                className='bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded'
+                                title='Copy Value'
+                              >
+                                Copy
+                              </button>
+                            )}
                             <button
                               onClick={() =>
                                 router.push(
@@ -703,6 +729,8 @@ export default function InventoryDetailPage() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Mobile Card View */}
               <div className='md:hidden space-y-4'>
                 {paginatedItems.map((invItem: CombinedInventoryItem) => (
                   <div
@@ -761,10 +789,19 @@ export default function InventoryDetailPage() {
                       )}
                     </div>
                     <div className='flex justify-end gap-2 mt-4 pt-3 border-t border-border-base'>
+                      {invItem.counted_units > 0 && (
+                        <button
+                          onClick={() => handleCopyValue(invItem)}
+                          className='bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded'
+                          title='Copy Value'
+                        >
+                          Copy
+                        </button>
+                      )}
                       <button
                         onClick={() =>
                           router.push(
-                            `/inventories/${inventoryId}/items/${invItem.id}`
+                            `/inventories/${inventoryId}/items/${invItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
                           )
                         }
                         className='bg-primary hover:bg-primary/90 text-text-inverse text-xs py-1 px-2 rounded'
@@ -803,7 +840,6 @@ export default function InventoryDetailPage() {
                 Displaying {paginatedItems.length} of {unenteredItems.length}{" "}
                 remaining items.
               </div>
-
               <PaginationControls
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -859,7 +895,7 @@ export default function InventoryDetailPage() {
             <button
               onClick={handleCompleteInventory}
               disabled={updateInventoryMutation.isPending}
-              className='bg-success hover:bg-success/90 text-text-inverse font-bold py-2 px-6 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
+              className='bg-success hover:bg-success/90 text-text-inverse font-bold py-2 px-6 rounded shadow-md'
             >
               {updateInventoryMutation.isPending
                 ? "Completing..."
