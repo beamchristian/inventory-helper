@@ -3,27 +3,29 @@
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
-import Image from "next/image"; // Import the Next.js Image component
 import { Button } from "@/components/ui/button";
 
 // ** InstallAppControl (With Installed Check) **
+// In your Header.tsx file
+
 function InstallAppControl() {
-  const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
-  const [isIOS, setIsIOS] = useState(false);
+  // This state controls the pop-up's visibility. It starts as false.
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
-  // 1. Add new state to track if the app is already installed
-  const [isStandalone, setIsStandalone] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+
+  // This state and effect handle the install prompt for non-Apple devices
+  const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
 
   useEffect(() => {
-    // 2. Check the display mode when the component mounts
-    setIsStandalone(window.matchMedia("(display-mode: standalone)").matches);
-
+    // Check if the user is on an Apple mobile device
     setIsIOS(/iPhone|iPad|iPod/.test(navigator.userAgent));
+
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
     return () => {
       window.removeEventListener(
         "beforeinstallprompt",
@@ -33,82 +35,54 @@ function InstallAppControl() {
   }, []);
 
   const handleInstallClick = async () => {
+    // If it's an iOS device, set state to true to show the instructions
     if (isIOS) {
       setShowIOSInstructions(true);
       return;
     }
+
+    // For other devices, trigger the standard install prompt
     if (deferredPrompt) {
-      // @ts-expect-error - prompt() is a non-standard property on the Event type
+      // @ts-expect-error - prompt() is a non-standard property
       deferredPrompt.prompt();
-      // @ts-expect-error - userChoice is a non-standard property on the Event type
+      // @ts-expect-error - userChoice is a non-standard property
       await deferredPrompt.userChoice;
       setDeferredPrompt(null);
     }
   };
 
-  // 3. If the app is installed, show a success message and stop.
-  if (isStandalone) {
-    return (
-      <div className='flex flex-col items-center text-emerald-500'>
-        <span className='text-2xl' title='App is installed'>
-          ✅
-        </span>
-      </div>
-    );
-  }
-
-  // The rest of the logic remains the same
-  if (!isIOS && !deferredPrompt) {
+  // Logic to determine if the install button should be shown at all
+  const canInstall = deferredPrompt || isIOS;
+  if (!canInstall) {
     return null;
   }
 
   return (
-    <div className='flex flex-col items-center relative'>
-      <Button
-        variant='ghost'
-        size='sm'
-        onClick={handleInstallClick}
-        title='Install App'
-      >
+    // Add `relative` to position the pop-up correctly
+    <div className='relative flex flex-col items-center'>
+      <button onClick={handleInstallClick} title='Install App'>
         📱
-      </Button>
+      </button>
+
+      {/* This JSX block is now correctly rendered ONLY when showIOSInstructions is true */}
       {showIOSInstructions && (
-        <div className='absolute top-full mt-2 w-64 p-4 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-10 text-black dark:text-white'>
-          <h3 className='text-md font-bold mb-2 text-center'>
-            Install App on iPhone
+        <div className='absolute top-full right-0 mt-2 w-64 p-4 bg-white dark:bg-gray-900 border dark:border-gray-700 rounded-lg shadow-xl z-20'>
+          <h3 className='text-md font-bold mb-2 text-center text-gray-900 dark:text-white'>
+            Install App Phone
           </h3>
-          <ol className='list-decimal list-inside text-sm space-y-2'>
+          <ol className='list-decimal list-inside text-sm space-y-2 text-gray-700 dark:text-gray-300'>
+            <li>Tap the **Share** button in your browser&apos;s menu.</li>
             <li>
-              Tap the <span className='font-bold'>Share</span> button
-              <Image
-                src='/icons/ios-share.png'
-                alt='iOS Share Icon'
-                width={20}
-                height={20}
-                className='inline h-5 w-5 mx-1'
-              />
-              in your browser&apos;s menu.
-            </li>
-            <li>
-              Scroll down and tap on{" "}
-              <span className='font-bold'>&apos;Add to Home Screen&apos;</span>
-              <Image
-                src='/icons/ios-add.png'
-                alt='iOS Add to Home Screen Icon'
-                width={20}
-                height={20}
-                className='inline h-5 w-5 ml-1'
-              />
-              .
+              Scroll down and tap on &apos;**Add to Home Screen**&apos; ➕.
             </li>
           </ol>
-          <Button
-            variant='secondary'
-            className='w-full mt-4'
+          {/* This button sets the state to false, hiding the pop-up */}
+          <button
             onClick={() => setShowIOSInstructions(false)}
+            className='w-full mt-4 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600'
           >
             Got It
-          </Button>
+          </button>
         </div>
       )}
     </div>
