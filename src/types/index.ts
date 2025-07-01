@@ -30,6 +30,7 @@ export interface InventoryItem {
   updated_at: string;
   // When fetching with join, you'll get item details:
   items: Item; // Supabase will nest this
+  is_entered: boolean;
 }
 
 export interface UpdateInventoryArgs {

@@ -16,6 +16,13 @@ type SortParams = {
   direction: "asc" | "desc";
 };
 
+type UpdateInventoryItemData = {
+  id: string; // The ID of the inventory item to update
+  inventory_id: string; // Used for cache invalidation
+  counted_units?: number;
+  is_entered?: boolean;
+};
+
 type CombinedInventoryItem = InventoryItem & { item: Item };
 
 const API_INVENTORY_ITEMS_BASE_URL = "/api/inventories";
@@ -286,23 +293,25 @@ export const useDeleteInventoryItem = () => {
  */
 export const useUpdateInventoryItem = () => {
   const queryClient = useQueryClient();
-  const { data: sessionData } = useSession(); // Keep sessionData here as `sessionData?.user?.id` is used
+  const { data: sessionData } = useSession();
 
-  return useMutation<
-    CombinedInventoryItem,
-    Error,
-    { id: string; counted_units: number; inventory_id: string }
-  >({
-    mutationFn: async (updatedItem) => {
+  // Use the new UpdateInventoryItemData type here
+  return useMutation<CombinedInventoryItem, Error, UpdateInventoryItemData>({
+    mutationFn: async (updateData) => {
       if (!sessionData?.user?.id) {
         throw new Error("User not authenticated.");
       }
+
+      // Destructure to separate the ID from the payload
+      const { id, inventory_id, ...payload } = updateData;
+
       const response = await fetch(
-        `${API_INVENTORY_ITEMS_BASE_URL}/${updatedItem.inventory_id}/items/${updatedItem.id}`,
+        `${API_INVENTORY_ITEMS_BASE_URL}/${inventory_id}/items/${id}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ counted_units: updatedItem.counted_units }),
+          // Send only the fields that need to be updated
+          body: JSON.stringify(payload),
         }
       );
 
@@ -317,11 +326,10 @@ export const useUpdateInventoryItem = () => {
       }
       return response.json();
     },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["inventoryItem", data.id] });
+    onSuccess: (variables) => {
+      // Invalidate queries to refetch fresh data
       queryClient.invalidateQueries({
         queryKey: ["inventoryItems", variables.inventory_id],
-        exact: false,
       });
       queryClient.invalidateQueries({
         queryKey: ["inventory", variables.inventory_id],

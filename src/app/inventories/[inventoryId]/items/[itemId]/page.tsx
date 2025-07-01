@@ -66,33 +66,36 @@ export default function InventoryItemDetailPage() {
   } = useInventoryItems(inventoryId);
   const updateInventoryItemMutation = useUpdateInventoryItem();
 
-  const allInventoryItems = useMemo(() => {
+  const navigableItems = useMemo(() => {
     if (!rawInventoryItems) return [];
+    // Filter out items that have already been marked as entered
+    const unentered = rawInventoryItems.filter((item) => !item.is_entered);
+
     switch (sortMode) {
       case "itemType":
-        return sortForItemTypeOnly(rawInventoryItems);
+        return sortForItemTypeOnly(unentered);
       case "default":
       default:
-        return sortForCountMode(rawInventoryItems);
+        return sortForCountMode(unentered);
     }
   }, [rawInventoryItems, sortMode]);
 
   const currentIndex = useMemo(
-    () => allInventoryItems?.findIndex((item) => item.id === itemId),
-    [allInventoryItems, itemId]
+    () => navigableItems.findIndex((item) => item.id === itemId),
+    [navigableItems, itemId]
   );
-  const totalItems = allInventoryItems?.length || 0;
+  const totalItems = navigableItems.length || 0;
 
   const navigateToItem = useCallback(
     (index: number) => {
-      if (allInventoryItems && index >= 0 && index < totalItems) {
-        const nextOrPrevItem = allInventoryItems[index];
+      if (navigableItems && index >= 0 && index < totalItems) {
+        const nextOrPrevItem = navigableItems[index];
         router.push(
           `/inventories/${inventoryId}/items/${nextOrPrevItem.id}?sortMode=${sortMode}`
         );
       }
     },
-    [allInventoryItems, inventoryId, router, sortMode, totalItems]
+    [navigableItems, inventoryId, router, sortMode, totalItems]
   );
 
   const performUpdate = useCallback(

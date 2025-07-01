@@ -58,9 +58,10 @@ export async function GET(
 /**
  * PATCH handler to update an InventoryItem (e.g., its counted_units).
  */
+// In /api/inventories/[inventoryId]/items/[itemId]/route.ts
+
 export async function PATCH(
   request: Request,
-  // FIXED: Removed explicit type annotation to allow for Promise<params>
   context: {
     params: Promise<{ inventoryId: string; itemId: string }>;
   }
@@ -77,25 +78,51 @@ export async function PATCH(
     const itemId = (await context.params).itemId;
     const body = await request.json();
 
-    const { counted_units } = body;
+    // 1. Destructure both possible fields from the request body
+    const { counted_units, is_entered } = body;
 
-    if (typeof counted_units !== "number") {
+    // 2. Create a payload object to hold only the valid data we receive
+    const updatePayload: { counted_units?: number; is_entered?: boolean } = {};
+
+    // 3. Validate and add each field to the payload if it exists
+    if (counted_units !== undefined) {
+      if (typeof counted_units !== "number" || counted_units < 0) {
+        return NextResponse.json(
+          { message: "Invalid 'counted_units' value provided." },
+          { status: 400 }
+        );
+      }
+      updatePayload.counted_units = counted_units;
+    }
+
+    if (is_entered !== undefined) {
+      if (typeof is_entered !== "boolean") {
+        return NextResponse.json(
+          { message: "Invalid 'is_entered' value provided." },
+          { status: 400 }
+        );
+      }
+      updatePayload.is_entered = is_entered;
+    }
+
+    // Check if any valid data was actually sent
+    if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json(
-        { message: "Invalid 'counted_units' value provided." },
+        { message: "No valid fields to update were provided." },
         { status: 400 }
       );
     }
 
+    // 4. Use the dynamically built payload in the update query
     const updatedInventoryItem = await db.inventoryItem.update({
       where: {
         id: itemId,
+        // Ensure the user owns the inventory this item belongs to
         inventory: {
           userId: userId,
         },
       },
-      data: {
-        counted_units: counted_units,
-      },
+      data: updatePayload,
     });
 
     return NextResponse.json(updatedInventoryItem);

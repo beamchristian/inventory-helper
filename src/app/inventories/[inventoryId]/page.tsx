@@ -1,4 +1,4 @@
-"use client"; // This page is a client component
+"use client";
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -74,6 +74,7 @@ export default function InventoryDetailPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedItemIdToAdd, setSelectedItemIdToAdd] = useState<string>("");
+  const [showEntered, setShowEntered] = useState(false);
 
   const {
     data: inventory,
@@ -87,7 +88,6 @@ export default function InventoryDetailPage() {
     isError: isAllItemsError,
     error: allItemsError,
   } = useAllItems();
-
   const {
     data: currentInventoryItems,
     isLoading: isCurrentItemsLoading,
@@ -107,24 +107,26 @@ export default function InventoryDetailPage() {
     }
   }, [status, router]);
 
-  const sortedInventoryItems = useMemo(() => {
-    if (!currentInventoryItems) return [];
+  const { unenteredItems, enteredItems } = useMemo(() => {
+    if (!currentInventoryItems) {
+      return { unenteredItems: [], enteredItems: [] };
+    }
     const sortableItems = [...currentInventoryItems];
     sortableItems.sort((a, b) => {
       let aValue: string | number | null | undefined;
       let bValue: string | number | null | undefined;
       switch (sortColumn) {
         case "name":
-          aValue = (a as CombinedInventoryItem).item.name;
-          bValue = (b as CombinedInventoryItem).item.name;
+          aValue = a.item.name;
+          bValue = b.item.name;
           break;
         case "unit_type":
-          aValue = (a as CombinedInventoryItem).item.unit_type;
-          bValue = (b as CombinedInventoryItem).item.unit_type;
+          aValue = a.item.unit_type;
+          bValue = b.item.unit_type;
           break;
         case "upc_number":
-          aValue = (a as CombinedInventoryItem).item.upc_number;
-          bValue = (b as CombinedInventoryItem).item.upc_number;
+          aValue = a.item.upc_number;
+          bValue = b.item.upc_number;
           break;
         case "counted_units":
           aValue = a.counted_units;
@@ -132,53 +134,49 @@ export default function InventoryDetailPage() {
           break;
         case "calculated_weight":
           aValue =
-            (a.counted_units || 0) *
-            ((a as CombinedInventoryItem).item.average_weight_per_unit || 0);
+            (a.counted_units || 0) * (a.item.average_weight_per_unit || 0);
           bValue =
-            (b.counted_units || 0) *
-            ((b as CombinedInventoryItem).item.average_weight_per_unit || 0);
+            (b.counted_units || 0) * (b.item.average_weight_per_unit || 0);
           break;
         case "brand":
-          aValue = (a as CombinedInventoryItem).item.brand;
-          bValue = (b as CombinedInventoryItem).item.brand;
+          aValue = a.item.brand;
+          bValue = b.item.brand;
           break;
         case "item_type":
-          aValue = (a as CombinedInventoryItem).item.item_type;
-          bValue = (b as CombinedInventoryItem).item.item_type;
+          aValue = a.item.item_type;
+          bValue = b.item.item_type;
           break;
         default:
-          aValue = (a as CombinedInventoryItem).item.name;
-          bValue = (b as CombinedInventoryItem).item.name;
+          aValue = a.item.name;
+          bValue = b.item.name;
       }
-      if (aValue === null || aValue === undefined)
-        return sortDirection === "asc" ? 1 : -1;
-      if (bValue === null || bValue === undefined)
-        return sortDirection === "asc" ? -1 : 1;
-      if (typeof aValue === "string" && typeof bValue === "string") {
-        return sortDirection === "asc"
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
+      let comparison = 0;
+      if (aValue === null || aValue === undefined) comparison = 1;
+      else if (bValue === null || bValue === undefined) comparison = -1;
+      else if (typeof aValue === "number" && typeof bValue === "number") {
+        comparison = aValue - bValue;
+      } else {
+        comparison = String(aValue).localeCompare(String(bValue));
       }
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
+      if (comparison === 0) {
+        comparison = a.item.name.localeCompare(b.item.name);
       }
-      const valA = String(aValue);
-      const valB = String(bValue);
-      return sortDirection === "asc"
-        ? valA.localeCompare(valB)
-        : valB.localeCompare(valA);
+      return sortDirection === "asc" ? comparison : -comparison;
     });
-    return sortableItems;
+    const unentered = sortableItems.filter((item) => !item.is_entered);
+    const entered = sortableItems.filter((item) => item.is_entered);
+    return { unenteredItems: unentered, enteredItems: entered };
   }, [currentInventoryItems, sortColumn, sortDirection]);
 
-  const totalItems = sortedInventoryItems.length;
+  // --- RESTORED LOGIC: START ---
+  const totalItems = unenteredItems.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return sortedInventoryItems.slice(startIndex, endIndex);
-  }, [sortedInventoryItems, currentPage, itemsPerPage]);
+    return unenteredItems.slice(startIndex, endIndex);
+  }, [unenteredItems, currentPage, itemsPerPage]);
 
   const availableItemsToAdd = useMemo(() => {
     if (!allUserItems || !currentInventoryItems) return [];
@@ -200,6 +198,7 @@ export default function InventoryDetailPage() {
       setSelectedItemIdToAdd("");
     }
   }, [availableItemsToAdd, selectedItemIdToAdd]);
+  // --- RESTORED LOGIC: END ---
 
   const showMessage = (
     message: string,
@@ -245,16 +244,6 @@ export default function InventoryDetailPage() {
       showMessage("Inventory ID is missing.", "error");
       return;
     }
-    const isAlreadyAdded = (currentInventoryItems || []).some(
-      (invItem) => invItem.item_id === selectedItemIdToAdd
-    );
-    if (isAlreadyAdded) {
-      showMessage(
-        "This item has already been added. Please select another item.",
-        "info"
-      );
-      return;
-    }
     try {
       await addInventoryItemMutation.mutateAsync({
         inventory_id: inventoryId,
@@ -263,17 +252,8 @@ export default function InventoryDetailPage() {
       });
       showMessage("Item added to inventory!", "success");
     } catch (err) {
-      let errorMessage = "Unknown error adding item.";
-      if (err instanceof Error) {
-        errorMessage = err.message;
-        if (
-          errorMessage.includes("Unique constraint failed") ||
-          errorMessage.includes("P2002")
-        ) {
-          errorMessage =
-            "This item has already been added. Please select another item.";
-        }
-      }
+      const errorMessage =
+        err instanceof Error ? err.message : "An unknown error adding item.";
       showMessage(`Error adding item: ${errorMessage}`, "error");
     }
   };
@@ -371,6 +351,34 @@ export default function InventoryDetailPage() {
     }
   };
 
+  const handleToggleEntered = async (
+    invItemId: string,
+    isEntering: boolean
+  ) => {
+    if (!inventoryId) {
+      showMessage("Inventory ID is missing.", "error");
+      return;
+    }
+    try {
+      await updateInventoryItemMutation.mutateAsync({
+        id: invItemId,
+        is_entered: isEntering,
+        inventory_id: inventoryId,
+      });
+      showMessage(
+        isEntering ? "Item marked as entered." : "Item moved back to list.",
+        "success"
+      );
+    } catch (err) {
+      showMessage(
+        `Error updating item status: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`,
+        "error"
+      );
+    }
+  };
+
   const handleCompleteInventory = async () => {
     if (!inventory?.id) {
       showMessage("Inventory ID is not available to complete.", "error");
@@ -411,6 +419,7 @@ export default function InventoryDetailPage() {
       </div>
     );
   }
+
   if (isInventoryError || isAllItemsError || isCurrentItemsError) {
     const errorMessage =
       inventoryError?.message ||
@@ -430,6 +439,7 @@ export default function InventoryDetailPage() {
       </div>
     );
   }
+
   if (!inventory) {
     return (
       <div className='min-h-screen flex items-center justify-center bg-background-base'>
@@ -452,10 +462,16 @@ export default function InventoryDetailPage() {
         id='messageBox'
         className='fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50 hidden'
       ></div>
-      <header className='flex flex-col sm:flex-row justify-between items-center mb-8 gap-4'>
-        <h1 className='text-3xl font-bold text-text-base text-center sm:text-left'>
-          Inventory: {inventory.name}
-        </h1>
+      <header className='flex flex-col sm:flex-row justify-between items-start mb-8 gap-4'>
+        <div>
+          <h1 className='text-3xl font-bold text-text-base text-center sm:text-left'>
+            Inventory: {inventory.name}
+          </h1>
+          <p className='text-md text-text-muted mt-1 text-center sm:text-left'>
+            {unenteredItems.length}{" "}
+            {unenteredItems.length === 1 ? "item" : "items"} to enter
+          </p>
+        </div>
         <div className='flex flex-col sm:flex-row gap-2'>
           <button
             onClick={() => router.push("/")}
@@ -498,7 +514,7 @@ export default function InventoryDetailPage() {
             {availableItemsToAdd.length === 0 ? (
               <option value=''>No more items to add</option>
             ) : (
-              availableItemsToAdd.map((item) => (
+              availableItemsToAdd.map((item: Item) => (
                 <option key={item.id} value={item.id}>
                   {item.name} ({item.unit_type})
                 </option>
@@ -533,17 +549,19 @@ export default function InventoryDetailPage() {
         </div>
 
         <div>
-          {sortedInventoryItems.length === 0 ? (
+          {unenteredItems.length === 0 ? (
             <p className='text-text-muted text-center py-8'>
-              This inventory has no items yet.
+              This inventory has no items to be entered. Check the &quot;Entered
+              Items&quot; list below.
             </p>
           ) : (
             <>
-              {/* Desktop Table (hidden on mobile) */}
+              {/* Desktop Table */}
               <div className='hidden md:block overflow-x-auto'>
                 <table className='min-w-full table-auto'>
                   <thead className='bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider'>
                     <tr>
+                      <th className='py-3 px-2 w-[5%] text-center'>Done</th>
                       <th
                         className='py-3 px-4 w-[25%] cursor-pointer'
                         onClick={() => handleSort("name")}
@@ -556,7 +574,7 @@ export default function InventoryDetailPage() {
                         className='py-3 px-4 w-[15%] cursor-pointer'
                         onClick={() => handleSort("upc_number")}
                       >
-                        UPC{" "}
+                        UPC
                         {sortColumn === "upc_number" &&
                           (sortDirection === "asc" ? "↑" : "↓")}
                       </th>
@@ -564,7 +582,7 @@ export default function InventoryDetailPage() {
                         className='py-3 px-4 w-[10%] cursor-pointer'
                         onClick={() => handleSort("brand")}
                       >
-                        Brand{" "}
+                        Brand
                         {sortColumn === "brand" &&
                           (sortDirection === "asc" ? "↑" : "↓")}
                       </th>
@@ -572,7 +590,7 @@ export default function InventoryDetailPage() {
                         className='py-3 px-4 w-[10%] cursor-pointer'
                         onClick={() => handleSort("item_type")}
                       >
-                        Type{" "}
+                        Type
                         {sortColumn === "item_type" &&
                           (sortDirection === "asc" ? "↑" : "↓")}
                       </th>
@@ -580,7 +598,7 @@ export default function InventoryDetailPage() {
                         className='py-3 px-4 w-[10%] text-center cursor-pointer'
                         onClick={() => handleSort("counted_units")}
                       >
-                        Count{" "}
+                        Count
                         {sortColumn === "counted_units" &&
                           (sortDirection === "asc" ? "↑" : "↓")}
                       </th>
@@ -588,17 +606,25 @@ export default function InventoryDetailPage() {
                         className='py-3 px-4 w-[15%] text-center cursor-pointer'
                         onClick={() => handleSort("calculated_weight")}
                       >
-                        Calculated Weight{" "}
+                        Calculated Weight
                         {sortColumn === "calculated_weight" &&
                           (sortDirection === "asc" ? "↑" : "↓")}
                       </th>
                       <th className='py-3 px-4 w-[15%] text-center'>Actions</th>
                     </tr>
                   </thead>
-
                   <tbody className='divide-y divide-border-base'>
                     {paginatedItems.map((invItem: CombinedInventoryItem) => (
                       <tr key={invItem.id} className='hover:bg-background-base'>
+                        <td className='py-3 px-2 text-center'>
+                          <input
+                            type='checkbox'
+                            className='h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary'
+                            onChange={() =>
+                              handleToggleEntered(invItem.id, true)
+                            }
+                          />
+                        </td>
                         <td className='py-3 px-4 text-foreground'>
                           <button
                             onClick={() =>
@@ -677,8 +703,6 @@ export default function InventoryDetailPage() {
                   </tbody>
                 </table>
               </div>
-
-              {/* Mobile Card View (hidden on desktop) */}
               <div className='md:hidden space-y-4'>
                 {paginatedItems.map((invItem: CombinedInventoryItem) => (
                   <div
@@ -697,21 +721,23 @@ export default function InventoryDetailPage() {
                           {invItem.item?.name || "N/A"}
                         </button>
                       </h3>
-                      <p className='text-sm text-text-muted'>
-                        {invItem.item?.brand || "N/A"}
-                      </p>
+                      <input
+                        type='checkbox'
+                        className='h-6 w-6 rounded border-gray-300 text-primary focus:ring-primary'
+                        onChange={() => handleToggleEntered(invItem.id, true)}
+                      />
                     </div>
                     <div className='space-y-2 text-sm'>
                       <div className='flex justify-between'>
                         <span className='font-semibold text-text-muted'>
                           UPC:
-                        </span>{" "}
+                        </span>
                         <span>{invItem.item?.upc_number || "N/A"}</span>
                       </div>
                       <div className='flex justify-between'>
                         <span className='font-semibold text-text-muted'>
                           Type:
-                        </span>{" "}
+                        </span>
                         <span className='capitalize'>
                           {invItem.item?.item_type || "N/A"}
                         </span>
@@ -719,21 +745,18 @@ export default function InventoryDetailPage() {
                       <div className='flex justify-between'>
                         <span className='font-semibold text-text-muted'>
                           Count:
-                        </span>{" "}
+                        </span>
                         <span>{invItem.counted_units}</span>
                       </div>
-                      {/* This block adds the calculated weight for relevant items */}
                       {invItem.item?.unit_type === "weight" && (
                         <div className='flex justify-between'>
                           <span className='font-semibold text-text-muted'>
                             Calc. Weight:
-                          </span>{" "}
-                          <span>
-                            {`${(
-                              (invItem.counted_units || 0) *
-                              (invItem.item?.average_weight_per_unit || 0)
-                            ).toFixed(2)} lbs`}
                           </span>
+                          <span>{`${(
+                            (invItem.counted_units || 0) *
+                            (invItem.item?.average_weight_per_unit || 0)
+                          ).toFixed(2)} lbs`}</span>
                         </div>
                       )}
                     </div>
@@ -776,6 +799,11 @@ export default function InventoryDetailPage() {
                 ))}
               </div>
 
+              <div className='text-center text-sm text-text-muted my-4'>
+                Displaying {paginatedItems.length} of {unenteredItems.length}{" "}
+                remaining items.
+              </div>
+
               <PaginationControls
                 currentPage={currentPage}
                 totalPages={totalPages}
@@ -784,6 +812,45 @@ export default function InventoryDetailPage() {
                 onItemsPerPageChange={handleItemsPerPageChange}
               />
             </>
+          )}
+        </div>
+
+        <div className='mt-12'>
+          <button
+            onClick={() => setShowEntered(!showEntered)}
+            className='text-lg font-semibold text-primary hover:underline w-full text-left p-2 rounded flex justify-between items-center'
+          >
+            <span>✅ Entered Items ({enteredItems.length})</span>
+            <span>{showEntered ? "Hide" : "Show"}</span>
+          </button>
+          {showEntered && (
+            <div className='mt-4 border-t border-border-base pt-4'>
+              {enteredItems.length === 0 ? (
+                <p className='text-text-muted text-center'>
+                  No items have been marked as entered yet.
+                </p>
+              ) : (
+                <ul className='space-y-2'>
+                  {enteredItems.map((item: CombinedInventoryItem) => (
+                    <li
+                      key={item.id}
+                      className='flex items-center justify-between p-2 bg-background-base rounded'
+                    >
+                      <span className='text-text-base'>
+                        {item.item?.name || "N/A"}
+                      </span>
+                      <button
+                        onClick={() => handleToggleEntered(item.id, false)}
+                        className='text-sm text-accent hover:underline'
+                        title='Move back to main list'
+                      >
+                        Undo
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
 
