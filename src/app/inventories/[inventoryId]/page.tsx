@@ -666,7 +666,7 @@ export default function InventoryDetailPage() {
                             <button
                               onClick={() =>
                                 router.push(
-                                  `/inventories/${inventoryId}/items/${invItem.id}`
+                                  `/inventories/${inventoryId}/items/${invItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
                                 )
                               }
                               className='bg-primary hover:bg-primary/90 text-text-inverse text-xs py-1 px-2 rounded'
@@ -714,7 +714,7 @@ export default function InventoryDetailPage() {
                         <button
                           onClick={() =>
                             router.push(
-                              `/inventories/${inventoryId}/items/${invItem.id}`
+                              `/inventories/${inventoryId}/items/${invItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
                             )
                           }
                         >

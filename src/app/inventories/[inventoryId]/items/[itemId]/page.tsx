@@ -8,8 +8,16 @@ import {
   useInventoryItems,
   useUpdateInventoryItem,
 } from "@/hooks/useInventoryItems";
-import { sortForCountMode, sortForItemTypeOnly } from "@/lib/utils";
 import { PaginationControls } from "@/components/PaginationControls";
+
+type InventoryItemSortColumn =
+  | "name"
+  | "unit_type"
+  | "upc_number"
+  | "counted_units"
+  | "calculated_weight"
+  | "brand"
+  | "item_type";
 
 /**
  * useInventoryItemDetails Hook
@@ -48,7 +56,12 @@ export default function InventoryItemDetailPage() {
 
   const inventoryId = params.inventoryId as string;
   const itemId = params.itemId as string;
-  const sortMode = searchParams.get("sortMode") || "default";
+
+  // NEW: Read sort parameters from the URL, providing defaults to match the main page
+  const sortColumn =
+    (searchParams.get("sortColumn") as InventoryItemSortColumn) || "item_type";
+  const sortDirection =
+    (searchParams.get("sortDirection") as "asc" | "desc") || "asc";
 
   const [inputValue, setInputValue] = useState<string>("");
 
@@ -66,19 +79,68 @@ export default function InventoryItemDetailPage() {
   } = useInventoryItems(inventoryId);
   const updateInventoryItemMutation = useUpdateInventoryItem();
 
+  // MODIFIED: This now uses the exact same sorting logic as the main page
   const navigableItems = useMemo(() => {
     if (!rawInventoryItems) return [];
-    // Filter out items that have already been marked as entered
-    const unentered = rawInventoryItems.filter((item) => !item.is_entered);
 
-    switch (sortMode) {
-      case "itemType":
-        return sortForItemTypeOnly(unentered);
-      case "default":
-      default:
-        return sortForCountMode(unentered);
-    }
-  }, [rawInventoryItems, sortMode]);
+    const unentered = rawInventoryItems.filter((item) => !item.is_entered);
+    const sortableItems = [...unentered];
+
+    sortableItems.sort((a, b) => {
+      let aValue: any, bValue: any;
+      switch (sortColumn) {
+        case "name":
+          aValue = a.item.name;
+          bValue = b.item.name;
+          break;
+        case "unit_type":
+          aValue = a.item.unit_type;
+          bValue = b.item.unit_type;
+          break;
+        case "upc_number":
+          aValue = a.item.upc_number;
+          bValue = b.item.upc_number;
+          break;
+        case "counted_units":
+          aValue = a.counted_units;
+          bValue = b.counted_units;
+          break;
+        case "calculated_weight":
+          aValue =
+            (a.counted_units || 0) * (a.item.average_weight_per_unit || 0);
+          bValue =
+            (b.counted_units || 0) * (b.item.average_weight_per_unit || 0);
+          break;
+        case "brand":
+          aValue = a.item.brand;
+          bValue = b.item.brand;
+          break;
+        case "item_type":
+          aValue = a.item.item_type;
+          bValue = b.item.item_type;
+          break;
+        default:
+          aValue = a.item.name;
+          bValue = b.item.name;
+      }
+
+      let comparison = 0;
+      if (aValue === null || aValue === undefined) comparison = 1;
+      else if (bValue === null || bValue === undefined) comparison = -1;
+      else if (typeof aValue === "number" && typeof bValue === "number") {
+        comparison = aValue - bValue;
+      } else {
+        comparison = String(aValue).localeCompare(String(bValue));
+      }
+
+      if (comparison === 0) {
+        comparison = a.item.name.localeCompare(b.item.name);
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+    return sortableItems;
+  }, [rawInventoryItems, sortColumn, sortDirection]);
 
   const currentIndex = useMemo(
     () => navigableItems.findIndex((item) => item.id === itemId),
@@ -86,16 +148,17 @@ export default function InventoryItemDetailPage() {
   );
   const totalItems = navigableItems.length || 0;
 
+  // MODIFIED: Navigation now preserves the sort parameters
   const navigateToItem = useCallback(
     (index: number) => {
       if (navigableItems && index >= 0 && index < totalItems) {
         const nextOrPrevItem = navigableItems[index];
         router.push(
-          `/inventories/${inventoryId}/items/${nextOrPrevItem.id}?sortMode=${sortMode}`
+          `/inventories/${inventoryId}/items/${nextOrPrevItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
         );
       }
     },
-    [navigableItems, inventoryId, router, sortMode, totalItems]
+    [navigableItems, inventoryId, router, sortColumn, sortDirection, totalItems]
   );
 
   const performUpdate = useCallback(
