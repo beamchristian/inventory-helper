@@ -98,16 +98,23 @@ import { Button } from "@/components/ui/button";
 //   );
 // }
 
-// ** InstallAppControl (Corrected) **
+// ** InstallAppControl (With iOS Instructions) **
 function InstallAppControl() {
   const [deferredPrompt, setDeferredPrompt] = useState<Event | null>(null);
+  const [isIOS, setIsIOS] = useState(false);
+  const [showIOSInstructions, setShowIOSInstructions] = useState(false);
 
   useEffect(() => {
+    // 1. Detect if the user is on an iOS device
+    setIsIOS(/iPhone|iPad|iPod/.test(navigator.userAgent));
+
+    // 2. Set up the standard install prompt listener
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
     return () => {
       window.removeEventListener(
         "beforeinstallprompt",
@@ -117,21 +124,30 @@ function InstallAppControl() {
   }, []);
 
   const handleInstallClick = async () => {
+    // If it's an iOS device, just show the instructions pop-up
+    if (isIOS) {
+      setShowIOSInstructions(true);
+      return;
+    }
+
+    // For other devices, trigger the default install prompt
     if (deferredPrompt) {
-      // @ts-expect-error does not exist on event
+      // @ts-expect-error
       deferredPrompt.prompt();
-      // @ts-expect-error does not exist on event
+      // @ts-expect-error
       await deferredPrompt.userChoice;
       setDeferredPrompt(null);
     }
   };
 
-  if (!deferredPrompt) {
+  // Only hide the button if it's not an iOS device AND there's no install prompt
+  if (!isIOS && !deferredPrompt) {
     return null;
   }
 
   return (
-    <div className='flex flex-col items-center'>
+    // Add `relative` to allow the absolute positioning of the pop-up
+    <div className='flex flex-col items-center relative'>
       <Button
         variant='ghost'
         size='sm'
@@ -140,6 +156,43 @@ function InstallAppControl() {
       >
         📱
       </Button>
+
+      {/* This is the pop-up for iOS users */}
+      {showIOSInstructions && (
+        <div className='absolute top-full mt-2 w-64 p-4 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-10 text-black dark:text-white'>
+          <h3 className='text-md font-bold mb-2 text-center'>
+            Install App on iPhone
+          </h3>
+          <ol className='list-decimal list-inside text-sm space-y-2'>
+            <li>
+              Tap the <span className='font-bold'>Share</span> button
+              <img
+                src='/icons/ios-share.png'
+                alt='iOS Share Icon'
+                className='inline h-5 w-5 mx-1'
+              />
+              in your browser's menu.
+            </li>
+            <li>
+              Scroll down and tap on{" "}
+              <span className='font-bold'>'Add to Home Screen'</span>
+              <img
+                src='/icons/ios-add.png'
+                alt='iOS Add to Home Screen Icon'
+                className='inline h-5 w-5 ml-1'
+              />
+              .
+            </li>
+          </ol>
+          <Button
+            variant='secondary'
+            className='w-full mt-4'
+            onClick={() => setShowIOSInstructions(false)}
+          >
+            Got It
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
