@@ -14,7 +14,6 @@ import {
   useAddAllInventoryItems,
 } from "../../../hooks/useInventoryItems";
 import { useUpdateInventory } from "../../../hooks/useInventories";
-import { sortForItemTypeOnly } from "@/lib/utils";
 import { PaginationControls } from "@/components/PaginationControls";
 
 /**
@@ -69,7 +68,8 @@ export default function InventoryDetailPage() {
   const inventoryId = params.inventoryId as string;
   const { status } = useSession();
 
-  const [sortColumn, setSortColumn] = useState<InventoryItemSortColumn>("name");
+  const [sortColumn, setSortColumn] =
+    useState<InventoryItemSortColumn>("item_type");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -219,18 +219,6 @@ export default function InventoryDetailPage() {
         if (messageBox) messageBox.style.display = "none";
       }, 5000);
     }
-  };
-
-  const handleStartItemTypeCountMode = () => {
-    if (!currentInventoryItems || currentInventoryItems.length === 0) {
-      showMessage("There are no items in this inventory to count.", "info");
-      return;
-    }
-    const sortedForCount = sortForItemTypeOnly(currentInventoryItems);
-    const firstItemId = sortedForCount[0].id;
-    router.push(
-      `/inventories/${inventoryId}/items/${firstItemId}?sortMode=itemType`
-    );
   };
 
   const handleSort = (column: InventoryItemSortColumn) => {
@@ -470,15 +458,6 @@ export default function InventoryDetailPage() {
         </h1>
         <div className='flex flex-col sm:flex-row gap-2'>
           <button
-            onClick={handleStartItemTypeCountMode}
-            disabled={
-              !currentInventoryItems || currentInventoryItems.length === 0
-            }
-            className='bg-accent hover:bg-accent/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed'
-          >
-            Count by Type
-          </button>
-          <button
             onClick={() => router.push("/")}
             className='bg-secondary hover:bg-secondary/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md w-full sm:w-auto'
           >
@@ -566,10 +545,10 @@ export default function InventoryDetailPage() {
                   <thead className='bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider'>
                     <tr>
                       <th
-                        className='py-3 px-4 w-[30%] cursor-pointer'
+                        className='py-3 px-4 w-[25%] cursor-pointer'
                         onClick={() => handleSort("name")}
                       >
-                        Name{" "}
+                        Name
                         {sortColumn === "name" &&
                           (sortDirection === "asc" ? "↑" : "↓")}
                       </th>
@@ -582,7 +561,7 @@ export default function InventoryDetailPage() {
                           (sortDirection === "asc" ? "↑" : "↓")}
                       </th>
                       <th
-                        className='py-3 px-4 w-[15%] cursor-pointer'
+                        className='py-3 px-4 w-[10%] cursor-pointer'
                         onClick={() => handleSort("brand")}
                       >
                         Brand{" "}
@@ -605,14 +584,31 @@ export default function InventoryDetailPage() {
                         {sortColumn === "counted_units" &&
                           (sortDirection === "asc" ? "↑" : "↓")}
                       </th>
-                      <th className='py-3 px-4 w-[20%] text-center'>Actions</th>
+                      <th
+                        className='py-3 px-4 w-[15%] text-center cursor-pointer'
+                        onClick={() => handleSort("calculated_weight")}
+                      >
+                        Calculated Weight{" "}
+                        {sortColumn === "calculated_weight" &&
+                          (sortDirection === "asc" ? "↑" : "↓")}
+                      </th>
+                      <th className='py-3 px-4 w-[15%] text-center'>Actions</th>
                     </tr>
                   </thead>
+
                   <tbody className='divide-y divide-border-base'>
                     {paginatedItems.map((invItem: CombinedInventoryItem) => (
                       <tr key={invItem.id} className='hover:bg-background-base'>
                         <td className='py-3 px-4 text-foreground'>
-                          {invItem.item?.name || "N/A"}
+                          <button
+                            onClick={() =>
+                              router.push(
+                                `/inventories/${inventoryId}/items/${invItem.id}`
+                              )
+                            }
+                          >
+                            {invItem.item?.name || "N/A"}
+                          </button>
                         </td>
                         <td className='py-3 px-4 text-text-muted'>
                           {invItem.item?.upc_number || "N/A"}
@@ -625,6 +621,19 @@ export default function InventoryDetailPage() {
                         </td>
                         <td className='py-3 px-4 text-text-muted text-center'>
                           {invItem.counted_units}
+                        </td>
+                        <td className='py-3 px-4 text-text-muted text-center'>
+                          {invItem.item?.unit_type === "weight" ? (
+                            <>
+                              {(
+                                (invItem.counted_units || 0) *
+                                (invItem.item?.average_weight_per_unit || 0)
+                              ).toFixed(2)}{" "}
+                              lbs
+                            </>
+                          ) : (
+                            "N/A"
+                          )}
                         </td>
                         <td className='py-3 px-4 text-center'>
                           <div className='flex justify-center items-center gap-2'>
@@ -678,7 +687,15 @@ export default function InventoryDetailPage() {
                   >
                     <div className='flex justify-between items-center mb-2'>
                       <h3 className='font-bold text-lg text-foreground'>
-                        {invItem.item?.name || "N/A"}
+                        <button
+                          onClick={() =>
+                            router.push(
+                              `/inventories/${inventoryId}/items/${invItem.id}`
+                            )
+                          }
+                        >
+                          {invItem.item?.name || "N/A"}
+                        </button>
                       </h3>
                       <p className='text-sm text-text-muted'>
                         {invItem.item?.brand || "N/A"}
@@ -705,6 +722,20 @@ export default function InventoryDetailPage() {
                         </span>{" "}
                         <span>{invItem.counted_units}</span>
                       </div>
+                      {/* This block adds the calculated weight for relevant items */}
+                      {invItem.item?.unit_type === "weight" && (
+                        <div className='flex justify-between'>
+                          <span className='font-semibold text-text-muted'>
+                            Calc. Weight:
+                          </span>{" "}
+                          <span>
+                            {`${(
+                              (invItem.counted_units || 0) *
+                              (invItem.item?.average_weight_per_unit || 0)
+                            ).toFixed(2)} lbs`}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div className='flex justify-end gap-2 mt-4 pt-3 border-t border-border-base'>
                       <button
