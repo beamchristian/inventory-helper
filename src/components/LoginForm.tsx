@@ -1,27 +1,35 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-// We don't even need the router here anymore for the redirect
+import HCaptcha from "@hcaptcha/react-hcaptcha"; // Import HCaptcha
 import { loginwithCreds } from "@/actions/auth";
-import AuthButton from "./AuthButton"; // Assuming this is your submit button
+import AuthButton from "./AuthButton";
 
 function LoginForm() {
   const [error, setError] = useState<string | undefined>();
-  // useTransition is helpful to disable inputs while the async action is running
+  // NEW: Add state to hold the CAPTCHA token
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(undefined);
 
+    // NEW: Check if the CAPTCHA was completed
+    if (!captchaToken) {
+      setError("Please complete the CAPTCHA before signing in.");
+      return;
+    }
+
     const formData = new FormData(event.currentTarget);
 
     startTransition(async () => {
       const result = await loginwithCreds(formData);
 
-      if (result.success) {
+      if (result?.success) {
+        // A full page refresh is a reliable way to update the session
         window.location.href = "/";
-      } else {
+      } else if (result?.error) {
         setError(result.error);
       }
     });
@@ -33,8 +41,8 @@ function LoginForm() {
         <h2 className='text-2xl font-bold text-center text-text-base'>
           Sign in to your account
         </h2>
-
         <form onSubmit={handleSubmit} className='space-y-6'>
+          {/* Email and Password inputs remain the same */}
           <div>
             <label
               htmlFor='email'
@@ -47,7 +55,7 @@ function LoginForm() {
               placeholder='you@example.com'
               id='email'
               name='email'
-              className='mt-1 block w-full px-3 py-2 bg-background border border-border-base rounded-md shadow-sm placeholder-text-muted text-text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary'
+              className='mt-1 block w-full px-3 py-2 bg-background border border-border-base rounded-md'
               required
               disabled={isPending}
             />
@@ -64,15 +72,21 @@ function LoginForm() {
               placeholder='Password'
               name='password'
               id='password'
-              className='mt-1 block w-full px-3 py-2 bg-background border border-border-base rounded-md shadow-sm placeholder-text-muted text-text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary'
+              className='mt-1 block w-full px-3 py-2 bg-background border border-border-base rounded-md'
               required
               disabled={isPending}
             />
           </div>
 
-          {error && <p className='text-sm text-error'>{error}</p>}
+          {/* NEW: Add the HCaptcha component and the hidden input */}
+          <HCaptcha
+            sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY!}
+            onVerify={setCaptchaToken}
+            onExpire={() => setCaptchaToken(null)}
+          />
+          <input type='hidden' name='captchaToken' value={captchaToken || ""} />
 
-          {/* You'll need to pass the pending state to your button */}
+          {error && <p className='text-sm text-error'>{error}</p>}
           <AuthButton isPending={isPending} />
         </form>
       </div>
@@ -81,22 +95,3 @@ function LoginForm() {
 }
 
 export default LoginForm;
-
-// You would also need a small change to AuthButton to accept the prop
-// since useFormStatus won't work with this onSubmit pattern.
-/*
-// Example AuthButton.tsx
-"use client";
-
-export default function AuthButton({ isPending }: { isPending: boolean }) {
-  return (
-    <button
-      type='submit'
-      disabled={isPending}
-      className='w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50'
-    >
-      {isPending ? "Signing In..." : "Sign In"}
-    </button>
-  );
-}
-*/

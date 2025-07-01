@@ -1,17 +1,15 @@
-// src/actions/auth.ts
 "use server";
 
-import { signIn, signOut } from "@/lib/auth"; // Assuming this points to your auth.ts
+import { signIn, signOut } from "@/lib/auth";
 import { AuthError } from "next-auth";
 import { revalidatePath } from "next/cache";
 
-// 1. Update the state shape to include a success flag.
 export interface ActionState {
   error?: string;
   success?: boolean;
 }
 
-// These actions can remain as they are if you use them elsewhere
+// These actions can remain as they are
 export const login = async (provider: string) => {
   await signIn(provider, { redirectTo: "/" });
   revalidatePath("/");
@@ -22,24 +20,52 @@ export const logout = async () => {
   revalidatePath("/");
 };
 
-// 2. Update the loginwithCreds function signature and logic.
-// It no longer needs prevState and will not handle redirection itself.
+/**
+ * Logs in a user with credentials after validating their CAPTCHA token.
+ */
 export const loginwithCreds = async (
   formData: FormData
 ): Promise<ActionState> => {
+  // NEW: Extract the captcha token from the form data
+  const captchaToken = formData.get("captchaToken") as string;
+
+  if (!captchaToken) {
+    return { error: "CAPTCHA not completed. Please try again." };
+  }
+
+  // --- NEW: Server-side CAPTCHA Validation ---
   try {
-    // We pass the redirectTo: false option here. This is crucial.
-    // It tells NextAuth to return the result of the login attempt
-    // instead of throwing a redirect error.
-    await signIn("credentials", {
-      ...Object.fromEntries(formData),
-      redirect: false,
+    const params = new URLSearchParams();
+    params.append("secret", process.env.HCAPTCHA_SECRET_KEY!);
+    params.append("response", captchaToken);
+
+    const captchaResponse = await fetch("https://api.hcaptcha.com/siteverify", {
+      method: "POST",
+      body: params,
     });
 
-    // If signIn completes without throwing an error, login was successful.
+    const captchaData = await captchaResponse.json();
+
+    if (!captchaData.success) {
+      console.error("CAPTCHA verification failed:", captchaData["error-codes"]);
+      return { error: "Invalid CAPTCHA. Please try again." };
+    }
+  } catch (error) {
+    console.error("Server-side CAPTCHA verification error:", error);
+    return { error: "Could not verify CAPTCHA." };
+  }
+  // --- END: CAPTCHA Validation ---
+
+  // If CAPTCHA is valid, proceed with NextAuth sign-in
+  try {
+    await signIn("credentials", {
+      ...Object.fromEntries(formData),
+      redirect: false, // This is correct, it allows us to handle the result here
+    });
+
+    // If signIn completes without an error, the login was successful.
     return { success: true };
   } catch (error) {
-    // We only handle authentication errors here.
     if (error instanceof AuthError) {
       switch (error.type) {
         case "CredentialsSignin":
@@ -48,7 +74,7 @@ export const loginwithCreds = async (
           return { error: "An unexpected authentication error occurred." };
       }
     }
-    // For any other type of error, we re-throw it.
+    // For any other non-authentication error, re-throw it
     throw error;
   }
 };
