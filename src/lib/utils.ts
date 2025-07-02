@@ -1,4 +1,4 @@
-import { InventoryItem, Item } from "@/types";
+import { CombinedInventoryItem, InventoryItem, Item } from "@/types";
 import bcrypt from "bcryptjs";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
@@ -86,3 +86,59 @@ export function urlBase64ToUint8Array(base64String: string): Uint8Array {
   }
   return outputArray;
 }
+
+/**
+ * Calculates the total weight of an inventory item.
+ * @param invItem The combined inventory item.
+ * @returns The calculated weight, or 0 if not applicable.
+ */
+export const calculateWeight = (invItem: CombinedInventoryItem): number => {
+  if (invItem.item?.unit_type !== "weight") {
+    return 0;
+  }
+  return (
+    (invItem.counted_units || 0) * (invItem.item?.average_weight_per_unit || 0)
+  );
+};
+
+export const showMessage = (
+  message: string,
+  type: "info" | "error" | "success" = "info"
+) => {
+  const messageBox = document.getElementById("messageBox");
+  if (messageBox) {
+    messageBox.innerText = message;
+    messageBox.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg z-50 block `;
+    if (type === "error") messageBox.classList.add("bg-red-500", "text-white");
+    else if (type === "success")
+      messageBox.classList.add("bg-green-500", "text-white");
+    else messageBox.classList.add("bg-blue-500", "text-white");
+    messageBox.style.display = "block";
+    setTimeout(() => {
+      if (messageBox) messageBox.style.display = "none";
+    }, 3000);
+  }
+};
+
+export const handleCopyValue = (invItem: CombinedInventoryItem) => {
+  let valueToCopy: string;
+
+  if (invItem.item?.unit_type === "weight") {
+    valueToCopy = (
+      (invItem.counted_units || 0) *
+      (invItem.item?.average_weight_per_unit || 0)
+    ).toFixed(2);
+  } else {
+    valueToCopy = (invItem.counted_units || 0).toString();
+  }
+
+  navigator.clipboard.writeText(valueToCopy).then(
+    () => {
+      showMessage(`Copied "${valueToCopy}" to clipboard!`, "success");
+    },
+    (err) => {
+      showMessage("Failed to copy value.", "error");
+      console.error("Clipboard copy failed: ", err);
+    }
+  );
+};

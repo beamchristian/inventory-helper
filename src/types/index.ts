@@ -33,6 +33,17 @@ export interface InventoryItem {
   is_entered: boolean;
 }
 
+export type CombinedInventoryItem = InventoryItem & { item: Item };
+
+export type InventoryItemSortColumn =
+  | "name"
+  | "unit_type"
+  | "upc_number"
+  | "counted_units"
+  | "calculated_weight"
+  | "brand"
+  | "item_type";
+
 export interface UpdateInventoryArgs {
   id: string;
   status: "completed" | "active"; // Or whatever your status types are

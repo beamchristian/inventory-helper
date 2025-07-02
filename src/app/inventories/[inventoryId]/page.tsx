@@ -4,7 +4,13 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import { Inventory, InventoryItem, Item } from "@/types";
+import {
+  CombinedInventoryItem,
+  Inventory,
+  InventoryItem,
+  InventoryItemSortColumn,
+  Item,
+} from "@/types";
 import { useAllItems } from "@/hooks/useItems";
 import {
   useInventoryItems,
@@ -15,52 +21,9 @@ import {
 } from "../../../hooks/useInventoryItems";
 import { useUpdateInventory } from "../../../hooks/useInventories";
 import { PaginationControls } from "@/components/PaginationControls";
-
-/**
- * LoadingSpinner Component
- */
-const LoadingSpinner: React.FC = () => (
-  <div className='flex justify-center items-center h-20'>
-    <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
-  </div>
-);
-
-/**
- * useInventoryDetails Custom Hook
- */
-const useInventoryDetails = (inventoryId: string | undefined) => {
-  const { status } = useSession();
-  return useQuery<Inventory>({
-    queryKey: ["inventory", inventoryId],
-    queryFn: async () => {
-      if (!inventoryId) throw new Error("Inventory ID is missing.");
-      if (status !== "authenticated")
-        throw new Error("Authentication required.");
-      const response = await fetch(`/api/inventories/${inventoryId}`);
-      if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ message: response.statusText }));
-        throw new Error(
-          errorData.message || `Failed to fetch inventory: ${response.status}`
-        );
-      }
-      return response.json();
-    },
-    enabled: !!inventoryId && status === "authenticated",
-  });
-};
-
-type InventoryItemSortColumn =
-  | "name"
-  | "unit_type"
-  | "upc_number"
-  | "counted_units"
-  | "calculated_weight"
-  | "brand"
-  | "item_type";
-
-type CombinedInventoryItem = InventoryItem & { item: Item };
+import { useInventoryDetails } from "@/hooks/useInventoryDetails";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { handleCopyValue, showMessage } from "@/lib/utils";
 
 export default function InventoryDetailPage() {
   const router = useRouter();
@@ -197,49 +160,6 @@ export default function InventoryDetailPage() {
       setSelectedItemIdToAdd("");
     }
   }, [availableItemsToAdd, selectedItemIdToAdd]);
-
-  const showMessage = (
-    message: string,
-    type: "info" | "error" | "success" = "info"
-  ) => {
-    const messageBox = document.getElementById("messageBox");
-    if (messageBox) {
-      messageBox.innerText = message;
-      messageBox.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg z-50 block `;
-      if (type === "error")
-        messageBox.classList.add("bg-red-500", "text-white");
-      else if (type === "success")
-        messageBox.classList.add("bg-green-500", "text-white");
-      else messageBox.classList.add("bg-blue-500", "text-white");
-      messageBox.style.display = "block";
-      setTimeout(() => {
-        if (messageBox) messageBox.style.display = "none";
-      }, 3000);
-    }
-  };
-
-  const handleCopyValue = (invItem: CombinedInventoryItem) => {
-    let valueToCopy: string;
-
-    if (invItem.item?.unit_type === "weight") {
-      valueToCopy = (
-        (invItem.counted_units || 0) *
-        (invItem.item?.average_weight_per_unit || 0)
-      ).toFixed(2);
-    } else {
-      valueToCopy = (invItem.counted_units || 0).toString();
-    }
-
-    navigator.clipboard.writeText(valueToCopy).then(
-      () => {
-        showMessage(`Copied "${valueToCopy}" to clipboard!`, "success");
-      },
-      (err) => {
-        showMessage("Failed to copy value.", "error");
-        console.error("Clipboard copy failed: ", err);
-      }
-    );
-  };
 
   const handleSort = (column: InventoryItemSortColumn) => {
     setCurrentPage(1);
