@@ -2,15 +2,8 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
-import {
-  CombinedInventoryItem,
-  Inventory,
-  InventoryItem,
-  InventoryItemSortColumn,
-  Item,
-} from "@/types";
+import { CombinedInventoryItem, InventoryItemSortColumn, Item } from "@/types";
 import { useAllItems } from "@/hooks/useItems";
 import {
   useInventoryItems,
@@ -18,8 +11,8 @@ import {
   useDeleteInventoryItem,
   useUpdateInventoryItem,
   useAddAllInventoryItems,
-} from "../../../hooks/useInventoryItems";
-import { useUpdateInventory } from "../../../hooks/useInventories";
+} from "@/hooks/useInventoryItems";
+import { useUpdateInventory } from "@/hooks/useInventories";
 import { PaginationControls } from "@/components/PaginationControls";
 import { useInventoryDetails } from "@/hooks/useInventoryDetails";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
