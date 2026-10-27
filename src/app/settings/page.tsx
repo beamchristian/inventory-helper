@@ -21,7 +21,7 @@ const LoadingSpinner: React.FC = () => (
 
 const showMessage = (
   message: string,
-  type: "info" | "error" | "success" = "info"
+  type: "info" | "error" | "success" = "info",
 ) => {
   const messageBox = document.getElementById("settingsMessageBox");
   if (messageBox) {
@@ -68,7 +68,7 @@ export default function SettingsPage() {
   const paginationInfo = useMemo(() => itemsData?.pagination, [itemsData]);
   const totalPages = useMemo(
     () => paginationInfo?.totalPages || 1,
-    [paginationInfo]
+    [paginationInfo],
   );
 
   const addItemMutation = useAddItem();
@@ -101,7 +101,7 @@ export default function SettingsPage() {
   }, [status]);
 
   const handleNewItemChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value, type } = e.target;
     setNewItemForm((prev) => {
@@ -157,13 +157,13 @@ export default function SettingsPage() {
         `Error adding item: ${
           err instanceof Error ? err.message : "Unknown error"
         }`,
-        "error"
+        "error",
       );
     }
   };
 
   const handleEditItemChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value, type } = e.target;
     setEditingItem((prev) => {
@@ -204,7 +204,7 @@ export default function SettingsPage() {
         `Error updating item: ${
           err instanceof Error ? err.message : "Unknown error"
         }`,
-        "error"
+        "error",
       );
     }
   };
@@ -216,7 +216,7 @@ export default function SettingsPage() {
     }
     if (
       window.confirm(
-        "Are you sure you want to delete this item? This action cannot be undone."
+        "Are you sure you want to delete this item? It will also be removed from every inventory it appears in, including completed ones. This action cannot be undone.",
       )
     ) {
       try {
@@ -227,7 +227,7 @@ export default function SettingsPage() {
           `Error deleting item: ${
             err instanceof Error ? err.message : "Unknown error"
           }`,
-          "error"
+          "error",
         );
       }
     }

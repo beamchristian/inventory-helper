@@ -139,5 +139,5 @@ model InventoryItem {
 
   // Relations
   inventory Inventory @relation(fields: [inventory_id], references: [id], onDelete: Cascade)
-  item      Item      @relation(fields: [item_id], references: [id])
+  item      Item      @relation(fields: [item_id], references: [id], onDelete: Cascade)
 }
