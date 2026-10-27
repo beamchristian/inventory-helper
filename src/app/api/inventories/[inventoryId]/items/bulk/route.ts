@@ -96,10 +96,12 @@ export async function POST(
       counted_units: 0,
     }));
 
-    // 6. Bulk create new InventoryItem records
+    // 6. Bulk create new InventoryItem records. skipDuplicates relies on the
+    // (inventory_id, item_id) unique index, so a second "Add all" running at
+    // the same time skips items the first one already added.
     const result = await db.inventoryItem.createMany({
       data: dataToCreate,
-      // skipDuplicates: true,
+      skipDuplicates: true,
     });
 
     return NextResponse.json(

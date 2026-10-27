@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
 import { auth } from "@/lib/auth";
+import { normalizeUpc } from "@/lib/items";
 
 async function requireAdmin() {
   const session = await auth();
@@ -48,21 +49,34 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. Prepare the data for the new copies, assigning to the target user
-    const itemsToCreate = sourceItems.map((item) => ({
-      // Do not copy the original item's ID
-      name: item.name,
-      upc_number: item.upc_number,
-      average_weight_per_unit: item.average_weight_per_unit,
-      unit_type: item.unit_type,
-      item_type: item.item_type,
-      brand: item.brand,
-      user_id: targetUserId, // Assign to the new user
-    }));
+    // 3. Work out which UPCs the target user already has
+    const targetItems = await db.item.findMany({
+      where: { user_id: targetUserId },
+      select: { upc_number: true },
+    });
+    const takenUpcs = new Set(
+      targetItems.map((item) => normalizeUpc(item.upc_number))
+    );
 
-    // 4. Use createMany with skipDuplicates to efficiently copy items.
-    // This will automatically skip any items that would violate the unique
-    // constraint (i.e., target user already has an item with that UPC).
+    // 4. Prepare copies of only the new items, assigned to the target user
+    const itemsToCreate = [];
+    for (const item of sourceItems) {
+      const upc = normalizeUpc(item.upc_number);
+      if (!upc || takenUpcs.has(upc)) continue;
+      takenUpcs.add(upc); // also guards against repeats in the source
+      itemsToCreate.push({
+        // Do not copy the original item's ID
+        name: item.name.trim(),
+        upc_number: upc,
+        average_weight_per_unit: item.average_weight_per_unit,
+        unit_type: item.unit_type,
+        item_type: item.item_type,
+        brand: item.brand,
+        user_id: targetUserId, // Assign to the new user
+      });
+    }
+
+    // skipDuplicates is a last line of defence against a concurrent copy
     const result = await db.item.createMany({
       data: itemsToCreate,
       skipDuplicates: true,
@@ -73,9 +87,11 @@ export async function POST(request: Request) {
     const copiedCount = result.count;
     const skippedCount = totalSourceItems - copiedCount;
 
-    let message = `Successfully copied ${copiedCount} of ${totalSourceItems} items.`;
+    let message = `Copied ${copiedCount} of ${totalSourceItems} items.`;
     if (skippedCount > 0) {
-      message += ` ${skippedCount} items were skipped, likely due to conflicting UPC codes with the target user.`;
+      message += ` ${skippedCount} ${
+        skippedCount === 1 ? "item was" : "items were"
+      } skipped because the target user already has them.`;
     }
 
     return NextResponse.json({ message, count: copiedCount });

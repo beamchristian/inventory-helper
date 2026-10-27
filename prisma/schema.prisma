@@ -100,7 +100,7 @@ model Item {
   id                      String          @id @default(uuid())
   user_id                 String // @db.Uuid
   name                    String
-  upc_number              String?
+  upc_number              String // Required: every item has a UPC, unique per user
   average_weight_per_unit Float?
   unit_type               String // Consider making this an enum (e.g., `enum UnitType { QUANTITY, WEIGHT } @@schema("public")`)
   item_type               String?
@@ -140,4 +140,7 @@ model InventoryItem {
   // Relations
   inventory Inventory @relation(fields: [inventory_id], references: [id], onDelete: Cascade)
   item      Item      @relation(fields: [item_id], references: [id], onDelete: Cascade)
+
+  // Each master item can appear only once per inventory
+  @@unique([inventory_id, item_id])
 }

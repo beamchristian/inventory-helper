@@ -74,7 +74,7 @@ export default function SettingsPage() {
     Omit<Item, "id" | "created_at" | "updated_at" | "user_id">
   >({
     name: "",
-    upc_number: null,
+    upc_number: "",
     average_weight_per_unit: null,
     unit_type: "quantity",
     item_type: null,
@@ -132,7 +132,7 @@ export default function SettingsPage() {
       await addItemMutation.mutateAsync(itemToSave);
       setNewItemForm({
         name: "",
-        upc_number: null,
+        upc_number: "",
         average_weight_per_unit: null,
         unit_type: "quantity",
         item_type: null,
@@ -346,7 +346,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <Label htmlFor='newUpc'>
-                UPC <span className='font-normal text-muted-foreground'>(optional)</span>
+                UPC
               </Label>
               <Input
                 type='text'
@@ -354,6 +354,7 @@ export default function SettingsPage() {
                 name='upc_number'
                 value={newItemForm.upc_number || ""}
                 onChange={handleNewItemChange}
+                required
               />
             </div>
             <div>
@@ -477,6 +478,7 @@ export default function SettingsPage() {
                         name='upc_number'
                         value={editingItem.upc_number || ""}
                         onChange={handleEditItemChange}
+                        required
                         placeholder='UPC'
                         aria-label='UPC'
                       />

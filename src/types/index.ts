@@ -2,7 +2,7 @@ export interface Item {
   id: string;
   user_id: string;
   name: string;
-  upc_number: string | null;
+  upc_number: string;
   average_weight_per_unit: number | null;
   unit_type: "quantity" | "weight";
   item_type: string | null;

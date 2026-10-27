@@ -5,6 +5,13 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
 import { auth } from "@/lib/auth";
+import {
+  duplicateItemMessage,
+  findDuplicateItem,
+  isUniqueConstraintError,
+  normalizeUpc,
+  UPC_REQUIRED_MESSAGE,
+} from "@/lib/items";
 
 /**
  * Handles POST requests to create a new Master Item.
@@ -30,7 +37,7 @@ export async function POST(req: Request) {
       brand,
     } = body;
 
-    if (!name || !unit_type) {
+    if (typeof name !== "string" || !name.trim() || !unit_type) {
       return NextResponse.json(
         { message: "Name and Unit Type are required" },
         { status: 400 }
@@ -40,11 +47,27 @@ export async function POST(req: Request) {
     const finalAverageWeight =
       unit_type === "quantity" ? null : average_weight_per_unit;
 
+    // Every item needs a UPC, and a UPC can only be used once per user
+    const upc = normalizeUpc(upc_number);
+    if (!upc) {
+      return NextResponse.json(
+        { message: UPC_REQUIRED_MESSAGE },
+        { status: 400 }
+      );
+    }
+    const existing = await findDuplicateItem(session.user.id, upc);
+    if (existing) {
+      return NextResponse.json(
+        { message: duplicateItemMessage(existing) },
+        { status: 409 }
+      );
+    }
+
     const newMasterItem = await db.item.create({
       data: {
         user_id: session.user.id,
-        name,
-        upc_number: upc_number || null,
+        name: name.trim(),
+        upc_number: upc,
         average_weight_per_unit: finalAverageWeight,
         unit_type,
         item_type: item_type || null,
@@ -56,6 +79,13 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     // Fixed: changed 'any' to 'unknown'
     console.error("Error creating master item:", error);
+
+    if (isUniqueConstraintError(error)) {
+      return NextResponse.json(
+        { message: "An item with this UPC already exists." },
+        { status: 409 }
+      );
+    }
 
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";

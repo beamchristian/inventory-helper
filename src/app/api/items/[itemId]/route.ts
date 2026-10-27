@@ -2,6 +2,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db";
 import { auth } from "@/lib/auth";
+import { Prisma } from "@prisma/client";
+import {
+  duplicateItemMessage,
+  findDuplicateItem,
+  isUniqueConstraintError,
+  normalizeUpc,
+  UPC_REQUIRED_MESSAGE,
+} from "@/lib/items";
 
 // REFACTORED: Centralized error handler to reduce repetition.
 function handleError(error: unknown): NextResponse {
@@ -24,6 +32,13 @@ function handleError(error: unknown): NextResponse {
     return NextResponse.json(
       { message: "Item not found or you do not have permission." },
       { status: 404 }
+    );
+  }
+  // A concurrent request took the same UPC between our check and the write
+  if (isUniqueConstraintError(error)) {
+    return NextResponse.json(
+      { message: "An item with this UPC already exists." },
+      { status: 409 }
     );
   }
   const errorMessage =
@@ -85,15 +100,51 @@ export async function PATCH(
     const itemId = (await context.params).itemId;
     const body = await request.json();
 
-    // REFACTORED: Use a single 'update' call. Prisma will fail with a P2025 error
-    // if the 'where' clause doesn't find a matching record (i.e., wrong ID or wrong user).
-    // This eliminates the need for a separate 'findUnique' call first.
+    const current = await db.item.findUnique({
+      where: { id: itemId, user_id: userId }, // Enforce ownership
+    });
+    if (!current) {
+      return NextResponse.json(
+        { message: "Item not found or you do not have permission." },
+        { status: 404 }
+      );
+    }
+
+    // Only these fields may be edited; id, user_id and created_at stay fixed.
+    const data: Prisma.ItemUpdateInput = {};
+    if (typeof body.name === "string" && body.name.trim()) {
+      data.name = body.name.trim();
+    }
+    if ("upc_number" in body) {
+      // The UPC can be changed but never removed
+      const upc = normalizeUpc(body.upc_number);
+      if (!upc) {
+        return NextResponse.json(
+          { message: UPC_REQUIRED_MESSAGE },
+          { status: 400 }
+        );
+      }
+      // Reject a UPC that another of the user's items already uses
+      const existing = await findDuplicateItem(userId, upc, itemId);
+      if (existing) {
+        return NextResponse.json(
+          { message: duplicateItemMessage(existing) },
+          { status: 409 }
+        );
+      }
+      data.upc_number = upc;
+    }
+    if ("unit_type" in body) data.unit_type = body.unit_type;
+    if ("average_weight_per_unit" in body) {
+      data.average_weight_per_unit = body.average_weight_per_unit;
+    }
+    if ("item_type" in body) data.item_type = body.item_type || null;
+    if ("brand" in body) data.brand = body.brand || null;
+    if (data.unit_type === "quantity") data.average_weight_per_unit = null;
+
     const updatedItem = await db.item.update({
-      where: {
-        id: itemId,
-        user_id: userId, // Enforce ownership
-      },
-      data: body,
+      where: { id: itemId, user_id: userId },
+      data,
     });
 
     return NextResponse.json(updatedItem);

@@ -1,6 +1,13 @@
 import { NextResponse, NextRequest } from "next/server";
 import { db } from "@/lib/db/db";
 import { auth } from "@/lib/auth";
+import {
+  duplicateItemMessage,
+  findDuplicateItem,
+  isUniqueConstraintError,
+  normalizeUpc,
+  UPC_REQUIRED_MESSAGE,
+} from "@/lib/items";
 
 async function getUserIdFromSession() {
   const session = await auth();
@@ -56,12 +63,12 @@ export async function GET(request: NextRequest) {
     if (errorMessage.includes("Authentication required.")) {
       return NextResponse.json(
         { message: "Authentication required." },
-        { status: 401 }
+        { status: 401 },
       );
     }
     return NextResponse.json(
       { message: errorMessage || "Failed to fetch items." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -80,10 +87,10 @@ export async function POST(request: Request) {
       brand,
     } = body;
 
-    if (!name || !unit_type) {
+    if (typeof name !== "string" || !name.trim() || !unit_type) {
       return NextResponse.json(
         { message: "Name and Unit Type are required." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -91,11 +98,27 @@ export async function POST(request: Request) {
     const finalAverageWeight =
       unit_type === "quantity" ? null : average_weight_per_unit;
 
+    // Every item needs a UPC, and a UPC can only be used once per user
+    const upc = normalizeUpc(upc_number);
+    if (!upc) {
+      return NextResponse.json(
+        { message: UPC_REQUIRED_MESSAGE },
+        { status: 400 },
+      );
+    }
+    const existing = await findDuplicateItem(userId, upc);
+    if (existing) {
+      return NextResponse.json(
+        { message: duplicateItemMessage(existing) },
+        { status: 409 },
+      );
+    }
+
     const newItem = await db.item.create({
       data: {
         user_id: userId,
-        name,
-        upc_number: upc_number || null,
+        name: name.trim(),
+        upc_number: upc,
         average_weight_per_unit: finalAverageWeight,
         unit_type,
         item_type: item_type || null,
@@ -107,17 +130,24 @@ export async function POST(request: Request) {
   } catch (error: unknown) {
     // Fixed: changed 'any' to 'unknown'
     console.error("Error adding new item:", error);
+    // A concurrent request created the same UPC between our check and insert
+    if (isUniqueConstraintError(error)) {
+      return NextResponse.json(
+        { message: "An item with this UPC already exists." },
+        { status: 409 },
+      );
+    }
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
     if (errorMessage.includes("Authentication required.")) {
       return NextResponse.json(
         { message: "Authentication required." },
-        { status: 401 }
+        { status: 401 },
       );
     }
     return NextResponse.json(
       { message: errorMessage || "Failed to add item." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

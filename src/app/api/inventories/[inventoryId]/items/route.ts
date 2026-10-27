@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/db"; // Import the shared prisma client instance
 import { auth } from "@/lib/auth"; // Import your custom auth helper
+import { isUniqueConstraintError } from "@/lib/items";
 
 export async function GET(
   req: Request,
@@ -142,6 +143,13 @@ export async function POST(
 
     return NextResponse.json(newInventoryItem, { status: 201 });
   } catch (error: unknown) {
+    // A concurrent request (e.g. a double-click) added the same item first
+    if (isUniqueConstraintError(error)) {
+      return NextResponse.json(
+        { message: "Item already exists in this inventory." },
+        { status: 409 }
+      );
+    }
     console.error("Error adding item to inventory:", error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred.";
