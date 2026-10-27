@@ -142,6 +142,21 @@ export async function PATCH(
     if ("brand" in body) data.brand = body.brand || null;
     if (data.unit_type === "quantity") data.average_weight_per_unit = null;
 
+    // Items counted by weight need a positive average weight per unit
+    const unitType = (data.unit_type as string | undefined) ?? current.unit_type;
+    if (unitType === "weight") {
+      const weight =
+        "average_weight_per_unit" in data
+          ? data.average_weight_per_unit
+          : current.average_weight_per_unit;
+      if (typeof weight !== "number" || !Number.isFinite(weight) || weight <= 0) {
+        return NextResponse.json(
+          { message: "Average weight per unit must be a number greater than 0." },
+          { status: 400 }
+        );
+      }
+    }
+
     const updatedItem = await db.item.update({
       where: { id: itemId, user_id: userId },
       data,

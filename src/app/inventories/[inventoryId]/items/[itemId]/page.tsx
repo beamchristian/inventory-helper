@@ -8,26 +8,25 @@ import {
   useInventoryItems,
   useUpdateInventoryItem,
 } from "@/hooks/useInventoryItems";
+import { useUpdateItem } from "@/hooks/useItems";
 import { PaginationControls } from "@/components/PaginationControls";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft,
+  Check,
   ChevronLeft,
   ChevronRight,
   Equal,
   Minus,
+  Pencil,
   Plus,
+  X,
 } from "lucide-react";
 
 type InventoryItemSortColumn =
@@ -44,19 +43,19 @@ type InventoryItemSortColumn =
  */
 const useInventoryItemDetails = (
   inventoryId: string,
-  itemId: string | undefined
+  itemId: string | undefined,
 ) => {
   return useQuery<InventoryItem & { item: Item }>({
     queryKey: ["inventoryItem", itemId],
     queryFn: async () => {
       if (!itemId || !inventoryId) throw new Error("ID is missing.");
       const response = await fetch(
-        `/api/inventories/${inventoryId}/items/${itemId}`
+        `/api/inventories/${inventoryId}/items/${itemId}`,
       );
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(
-          errorData.message || "Failed to fetch inventory item details."
+          errorData.message || "Failed to fetch inventory item details.",
         );
       }
       return response.json();
@@ -64,6 +63,127 @@ const useInventoryItemDetails = (
     enabled: !!itemId && !!inventoryId,
   });
 };
+
+/**
+ * Inline editor for a weight item's average weight per unit. Saves to the
+ * master item, so the new weight applies in every inventory.
+ */
+function UnitWeightEditor({
+  item,
+  onSaved,
+}: {
+  item: Item;
+  onSaved: () => void;
+}) {
+  const updateItemMutation = useUpdateItem();
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const startEditing = () => {
+    setValue(item.average_weight_per_unit?.toString() ?? "");
+    setError(null);
+    setIsEditing(true);
+  };
+
+  const save = async () => {
+    const weight = parseFloat(value);
+    if (!Number.isFinite(weight) || weight <= 0) {
+      setError("Enter a weight greater than 0.");
+      return;
+    }
+    if (weight === item.average_weight_per_unit) {
+      setIsEditing(false);
+      return;
+    }
+    try {
+      await updateItemMutation.mutateAsync({
+        ...item,
+        average_weight_per_unit: weight,
+      });
+      setIsEditing(false);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save weight.");
+    }
+  };
+
+  if (!isEditing) {
+    return (
+      <div className='mt-0.5 flex items-center gap-1'>
+        <span className='font-medium tabular-nums text-foreground'>
+          {item.average_weight_per_unit?.toFixed(2) ?? "N/A"} lbs
+        </span>
+        <Button
+          variant='ghost'
+          size='icon-sm'
+          onClick={startEditing}
+          title='Edit average unit weight'
+          aria-label='Edit average unit weight'
+        >
+          <Pencil />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className='mt-1'>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          save();
+        }}
+        className='flex items-center gap-2'
+      >
+        <div className='relative w-32'>
+          <Input
+            type='number'
+            inputMode='decimal'
+            step='any'
+            min='0'
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setIsEditing(false)}
+            aria-label='Average unit weight in pounds'
+            className='h-8 pr-9 tabular-nums'
+            autoFocus
+          />
+          <span className='pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground'>
+            lbs
+          </span>
+        </div>
+        <Button
+          type='submit'
+          size='icon-sm'
+          disabled={updateItemMutation.isPending}
+          title='Save'
+          aria-label='Save weight'
+        >
+          <Check />
+        </Button>
+        <Button
+          type='button'
+          variant='ghost'
+          size='icon-sm'
+          onClick={() => setIsEditing(false)}
+          disabled={updateItemMutation.isPending}
+          title='Cancel'
+          aria-label='Cancel editing weight'
+        >
+          <X />
+        </Button>
+      </form>
+      {error ? (
+        <p className='mt-1.5 text-xs text-destructive'>{error}</p>
+      ) : (
+        <p className='mt-1.5 text-xs text-muted-foreground'>
+          Updates this item everywhere, including weights in past inventories.
+        </p>
+      )}
+    </div>
+  );
+}
 
 /**
  * InventoryItemDetailPage Component
@@ -165,7 +285,7 @@ export default function InventoryItemDetailPage() {
 
   const currentIndex = useMemo(
     () => navigableItems.findIndex((item) => item.id === itemId),
-    [navigableItems, itemId]
+    [navigableItems, itemId],
   );
   const totalItems = navigableItems.length || 0;
 
@@ -175,11 +295,18 @@ export default function InventoryItemDetailPage() {
       if (navigableItems && index >= 0 && index < totalItems) {
         const nextOrPrevItem = navigableItems[index];
         router.push(
-          `/inventories/${inventoryId}/items/${nextOrPrevItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
+          `/inventories/${inventoryId}/items/${nextOrPrevItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`,
         );
       }
     },
-    [navigableItems, inventoryId, router, sortColumn, sortDirection, totalItems]
+    [
+      navigableItems,
+      inventoryId,
+      router,
+      sortColumn,
+      sortDirection,
+      totalItems,
+    ],
   );
 
   const performUpdate = useCallback(
@@ -211,7 +338,7 @@ export default function InventoryItemDetailPage() {
         alert(
           `Error updating count: ${
             err instanceof Error ? err.message : "Unknown error"
-          }`
+          }`,
         );
       }
     },
@@ -221,7 +348,7 @@ export default function InventoryItemDetailPage() {
       queryClient,
       itemId,
       inventoryId,
-    ]
+    ],
   );
 
   const handleOperation = (operation: "add" | "subtract" | "replace") => {
@@ -398,16 +525,6 @@ export default function InventoryItemDetailPage() {
               { label: "Name", value: item?.name ?? "N/A" },
               { label: "Count by", value: item?.unit_type ?? "N/A" },
               { label: "UPC", value: item?.upc_number || "—", mono: true },
-              ...(item?.unit_type === "weight"
-                ? [
-                    {
-                      label: "Avg. unit weight",
-                      value: `${
-                        item?.average_weight_per_unit?.toFixed(2) || "N/A"
-                      } lbs`,
-                    },
-                  ]
-                : []),
               { label: "Type", value: item?.item_type || "—" },
               { label: "Brand", value: item?.brand || "—" },
             ].map((row) => (
@@ -416,13 +533,34 @@ export default function InventoryItemDetailPage() {
                 <dd
                   className={cn(
                     "mt-0.5 font-medium capitalize text-foreground",
-                    "mono" in row && row.mono && "font-mono normal-case"
+                    "mono" in row && row.mono && "font-mono normal-case",
                   )}
                 >
                   {row.value}
                 </dd>
               </div>
             ))}
+            {item?.unit_type === "weight" && (
+              <div className='sm:col-span-2'>
+                <dt className='text-xs text-muted-foreground'>
+                  Avg. unit weight
+                </dt>
+                <dd>
+                  <UnitWeightEditor
+                    item={item}
+                    onSaved={() => {
+                      // Refresh the totals that depend on the unit weight
+                      queryClient.invalidateQueries({
+                        queryKey: ["inventoryItem", itemId],
+                      });
+                      queryClient.invalidateQueries({
+                        queryKey: ["inventoryItems", inventoryId],
+                      });
+                    }}
+                  />
+                </dd>
+              </div>
+            )}
           </dl>
         </CardContent>
       </Card>

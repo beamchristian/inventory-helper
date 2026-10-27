@@ -462,42 +462,91 @@ export default function SettingsPage() {
                     // Edit Form replaces the item content
                     <form
                       onSubmit={handleUpdateItem}
-                      className='col-span-12 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4'
+                      className='col-span-12 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3'
                     >
-                      <Input
-                        type='text'
-                        name='name'
-                        value={editingItem.name}
-                        onChange={handleEditItemChange}
-                        required
-                        placeholder='Name'
-                        aria-label='Name'
-                      />
-                      <Input
-                        type='text'
-                        name='upc_number'
-                        value={editingItem.upc_number || ""}
-                        onChange={handleEditItemChange}
-                        required
-                        placeholder='UPC'
-                        aria-label='UPC'
-                      />
-                      <Input
-                        type='text'
-                        name='item_type'
-                        value={editingItem.item_type || ""}
-                        onChange={handleEditItemChange}
-                        placeholder='Type'
-                        aria-label='Type'
-                      />
-                      <Input
-                        type='text'
-                        name='brand'
-                        value={editingItem.brand || ""}
-                        onChange={handleEditItemChange}
-                        placeholder='Brand'
-                        aria-label='Brand'
-                      />
+                      <div>
+                        <Label htmlFor={`edit-name-${item.id}`} className='text-xs'>
+                          Name
+                        </Label>
+                        <Input
+                          id={`edit-name-${item.id}`}
+                          type='text'
+                          name='name'
+                          value={editingItem.name}
+                          onChange={handleEditItemChange}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-upc-${item.id}`} className='text-xs'>
+                          UPC
+                        </Label>
+                        <Input
+                          id={`edit-upc-${item.id}`}
+                          type='text'
+                          name='upc_number'
+                          value={editingItem.upc_number || ""}
+                          onChange={handleEditItemChange}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-type-${item.id}`} className='text-xs'>
+                          Type
+                        </Label>
+                        <Input
+                          id={`edit-type-${item.id}`}
+                          type='text'
+                          name='item_type'
+                          value={editingItem.item_type || ""}
+                          onChange={handleEditItemChange}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-brand-${item.id}`} className='text-xs'>
+                          Brand
+                        </Label>
+                        <Input
+                          id={`edit-brand-${item.id}`}
+                          type='text'
+                          name='brand'
+                          value={editingItem.brand || ""}
+                          onChange={handleEditItemChange}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`edit-unit-${item.id}`} className='text-xs'>
+                          Count by
+                        </Label>
+                        <Select
+                          id={`edit-unit-${item.id}`}
+                          name='unit_type'
+                          value={editingItem.unit_type}
+                          onChange={handleEditItemChange}
+                          required
+                        >
+                          <option value='quantity'>Quantity</option>
+                          <option value='weight'>Weight (lbs)</option>
+                        </Select>
+                      </div>
+                      {editingItem.unit_type === "weight" && (
+                        <div>
+                          <Label htmlFor={`edit-weight-${item.id}`} className='text-xs'>
+                            Avg. weight per unit (lbs)
+                          </Label>
+                          <Input
+                            id={`edit-weight-${item.id}`}
+                            type='number'
+                            inputMode='decimal'
+                            name='average_weight_per_unit'
+                            step='any'
+                            min='0.01'
+                            value={editingItem.average_weight_per_unit ?? ""}
+                            onChange={handleEditItemChange}
+                            required
+                          />
+                        </div>
+                      )}
                       <div className='col-span-full flex justify-end gap-2'>
                         <Button
                           type='button'
