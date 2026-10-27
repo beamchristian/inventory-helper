@@ -12,12 +12,19 @@ import {
 
 import { Inventory } from "../types";
 import { PaginationControls } from "@/components/PaginationControls";
-
-const LoadingSpinner: React.FC = () => (
-  <div className='flex justify-center items-center h-20'>
-    <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
-  </div>
-);
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { StatusBadge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PageContainer, PageHeader } from "@/components/ui/page-header";
+import { ArrowRight, ClipboardList, Plus, Trash2 } from "lucide-react";
 
 const HomePage: React.FC = () => {
   const router = useRouter();
@@ -90,128 +97,152 @@ const HomePage: React.FC = () => {
   const isLoading = status === "loading" || isInventoriesLoading;
 
   return (
-    <div className='min-h-screen bg-background-base p-4'>
-      <header className='flex justify-center items-center mb-8 max-w-4xl mx-auto'>
-        <h1 className='text-4xl font-bold text-text-base'>Your Inventories</h1>
-      </header>
+    <PageContainer>
+      <PageHeader
+        title='Inventories'
+        description='Start a new count or pick up where you left off.'
+      />
 
-      <main className='max-w-4xl mx-auto'>
-        {status === "authenticated" && (
-          <div className='bg-background-surface p-6 rounded-lg shadow-md mb-8'>
-            <h2 className='text-2xl font-semibold mb-4 text-text-base'>
-              Start a New Inventory
-            </h2>
-            <form onSubmit={handleCreateInventory} className='flex gap-4'>
-              <input
+      {status === "authenticated" && (
+        <Card className='mb-6'>
+          <CardContent>
+            <form
+              onSubmit={handleCreateInventory}
+              className='flex flex-col gap-3 sm:flex-row'
+            >
+              <Input
                 type='text'
-                placeholder='Enter inventory name'
+                placeholder='New inventory name, e.g. "Weekly count – Oct 27"'
                 value={newInventoryName}
                 onChange={(e) => setNewInventoryName(e.target.value)}
                 required
-                className='flex-grow shadow appearance-none border border-border-base rounded w-full py-2 px-3 text-text-base focus:outline-none focus:ring-2 focus:ring-primary'
+                aria-label='New inventory name'
+                className='sm:flex-1'
               />
-              <button
-                type='submit'
-                disabled={createInventoryMutation.isPending}
-                className='bg-success hover:bg-success/90 text-text-inverse font-bold py-2 px-4 rounded disabled:opacity-50'
-              >
-                {createInventoryMutation.isPending ? "Creating..." : "Create"}
-              </button>
+              <Button type='submit' disabled={createInventoryMutation.isPending}>
+                <Plus />
+                {createInventoryMutation.isPending
+                  ? "Creating..."
+                  : "New inventory"}
+              </Button>
             </form>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>All inventories</CardTitle>
+            {pagination?.totalItems != null && (
+              <CardDescription>
+                {pagination.totalItems}{" "}
+                {pagination.totalItems === 1 ? "inventory" : "inventories"}
+              </CardDescription>
+            )}
           </div>
+        </CardHeader>
+
+        {isLoading && <LoadingSpinner className='h-40' />}
+
+        {status === "unauthenticated" && (
+          <p className='p-5 text-sm text-muted-foreground'>
+            Please sign in to view your inventories.
+          </p>
         )}
 
-        <div className='bg-background-surface p-6 rounded-lg shadow-md'>
-          <h2 className='text-2xl font-semibold mb-4 text-text-base'>
-            Past Inventories
-          </h2>
-          {isLoading && <LoadingSpinner />}
+        {isError && (
+          <p className='p-5 text-sm text-destructive'>
+            Error loading inventories: {error?.message}
+          </p>
+        )}
 
-          {status === "unauthenticated" && (
-            <p className='text-text-muted'>
-              Please sign in to view your inventories.
-            </p>
-          )}
-
-          {isError && (
-            <p className='text-error'>
-              Error loading inventories: {error?.message}
-            </p>
-          )}
-
-          {status === "authenticated" &&
-            !isLoading &&
-            !isError &&
-            (!inventories || inventories.length === 0) && ( // Check inventories array
-              <p className='text-text-muted'>
-                No inventories found. Start a new one above!
+        {status === "authenticated" &&
+          !isLoading &&
+          !isError &&
+          (!inventories || inventories.length === 0) && (
+            <div className='flex flex-col items-center px-5 py-14 text-center'>
+              <span className='mb-3 flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground'>
+                <ClipboardList className='size-5' />
+              </span>
+              <p className='text-sm font-medium text-foreground'>
+                No inventories yet
               </p>
-            )}
+              <p className='mt-1 text-sm text-muted-foreground'>
+                Create your first one above to start counting.
+              </p>
+            </div>
+          )}
 
-          {status === "authenticated" &&
-            !isLoading &&
-            !isError &&
-            inventories &&
-            inventories.length > 0 && (
-              <>
-                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-                  {inventories.map((inventory: Inventory) => (
-                    <div
-                      key={inventory.id}
-                      className='border border-border-base p-4 rounded-lg shadow-sm bg-background-base flex flex-col justify-between'
+        {status === "authenticated" &&
+          !isLoading &&
+          !isError &&
+          inventories &&
+          inventories.length > 0 && (
+            <>
+              <ul className='divide-y divide-border'>
+                {inventories.map((inventory: Inventory) => (
+                  <li
+                    key={inventory.id}
+                    className='group flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/50'
+                  >
+                    <button
+                      onClick={() =>
+                        router.push(`/inventories/${inventory.id}`)
+                      }
+                      className='flex min-w-0 flex-1 flex-col items-start gap-1 text-left sm:flex-row sm:items-center sm:gap-4'
                     >
-                      <div>
-                        <h3 className='text-xl font-semibold text-text-base mb-2'>
-                          {inventory.name}
-                        </h3>
-                        <p className='text-sm text-text-muted'>
-                          Status:{" "}
-                          <span className='capitalize font-medium'>
-                            {inventory.status}
-                          </span>
-                        </p>
-                        <p className='text-sm text-text-muted mb-4'>
-                          Created:{" "}
+                      <span className='truncate font-medium text-foreground group-hover:text-primary'>
+                        {inventory.name}
+                      </span>
+                      <span className='flex items-center gap-3'>
+                        <StatusBadge status={inventory.status} />
+                        <span className='text-xs text-muted-foreground'>
+                          Created{" "}
                           {new Date(inventory.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className='flex space-x-2 mt-4'>
-                        <button
-                          onClick={() =>
-                            router.push(`/inventories/${inventory.id}`)
-                          }
-                          className='flex-grow bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-3 rounded text-sm'
-                        >
-                          View/Resume
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleDeleteInventory(inventory.id, inventory.name)
-                          }
-                          disabled={deleteInventoryMutation.isPending}
-                          className='bg-error hover:bg-error/90 text-text-inverse font-bold py-2 px-3 rounded text-sm disabled:opacity-50'
-                        >
-                          Delete
-                        </button>
-                      </div>
+                        </span>
+                      </span>
+                    </button>
+                    <div className='flex shrink-0 items-center gap-1'>
+                      <Button
+                        variant='outline'
+                        size='sm'
+                        onClick={() =>
+                          router.push(`/inventories/${inventory.id}`)
+                        }
+                      >
+                        {inventory.status === "completed" ? "View" : "Resume"}
+                        <ArrowRight />
+                      </Button>
+                      <Button
+                        variant='ghost-destructive'
+                        size='icon-sm'
+                        onClick={() =>
+                          handleDeleteInventory(inventory.id, inventory.name)
+                        }
+                        disabled={deleteInventoryMutation.isPending}
+                        title='Delete inventory'
+                        aria-label={`Delete ${inventory.name}`}
+                      >
+                        <Trash2 />
+                      </Button>
                     </div>
-                  ))}
-                </div>
+                  </li>
+                ))}
+              </ul>
 
-                {/* Add Pagination Controls */}
-                <PaginationControls
-                  currentPage={currentPage}
-                  totalPages={pagination?.totalPages || 1}
-                  onPageChange={setCurrentPage}
-                  itemsPerPage={itemsPerPage}
-                  onItemsPerPageChange={handleItemsPerPageChange}
-                  noun='Page'
-                />
-              </>
-            )}
-        </div>
-      </main>
-    </div>
+              <PaginationControls
+                currentPage={currentPage}
+                totalPages={pagination?.totalPages || 1}
+                onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+                onItemsPerPageChange={handleItemsPerPageChange}
+                noun='Page'
+              />
+            </>
+          )}
+      </Card>
+    </PageContainer>
   );
 };
 

@@ -9,34 +9,21 @@ import {
   useDeleteItem,
 } from "../../hooks/useItems";
 import { Item } from "../../types";
-import { PaginationControls } from "../../components/PaginationControls"; // IMPORTED: New Pagination Component
-
-// ... (LoadingSpinner, showMessage, and SortColumn type remain the same) ...
-
-const LoadingSpinner: React.FC = () => (
-  <div className='flex justify-center items-center h-20'>
-    <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
-  </div>
-);
-
-const showMessage = (
-  message: string,
-  type: "info" | "error" | "success" = "info",
-) => {
-  const messageBox = document.getElementById("settingsMessageBox");
-  if (messageBox) {
-    messageBox.innerText = message;
-    messageBox.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg z-50 block `;
-    if (type === "error") messageBox.classList.add("bg-red-500", "text-white");
-    else if (type === "success")
-      messageBox.classList.add("bg-green-500", "text-white");
-    else messageBox.classList.add("bg-blue-500", "text-white");
-    messageBox.style.display = "block";
-    setTimeout(() => {
-      if (messageBox) messageBox.style.display = "none";
-    }, 5000);
-  }
-};
+import { PaginationControls } from "../../components/PaginationControls";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/button";
+import { Input, Label, Select } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PageContainer, PageHeader } from "@/components/ui/page-header";
+import { cn, showMessage } from "@/lib/utils";
+import { ArrowDown, ArrowUp, Package, Pencil, Plus, Trash2 } from "lucide-react";
 
 type SortColumn =
   | "name"
@@ -275,342 +262,306 @@ export default function SettingsPage() {
   };
 
   if (status === "loading" || isLoading) {
-    return (
-      <div className='min-h-screen flex items-center justify-center bg-background-base'>
-        <LoadingSpinner />
-      </div>
-    );
+    return <LoadingSpinner className='min-h-[60vh]' />;
   }
 
   if (status === "unauthenticated" || isError) {
     return (
-      <div className='min-h-screen flex items-center justify-center bg-background-base'>
-        <div className='text-center p-6 bg-background-surface rounded-lg shadow-md'>
-          <p className='text-error text-lg mb-4'>
-            {status === "unauthenticated"
-              ? "You must be logged in to view settings."
-              : `Error loading items: ${errorMessage}`}
-          </p>
-          <button
-            onClick={() => (window.location.href = "/sign-in")}
-            className='mt-4 bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded'
-          >
-            Go to Sign In
-          </button>
-        </div>
-      </div>
+      <PageContainer className='max-w-md'>
+        <Card>
+          <CardContent className='text-center'>
+            <p className='mb-4 text-sm text-destructive'>
+              {status === "unauthenticated"
+                ? "You must be logged in to view your items."
+                : `Error loading items: ${errorMessage}`}
+            </p>
+            <Button onClick={() => (window.location.href = "/sign-in")}>
+              Go to sign in
+            </Button>
+          </CardContent>
+        </Card>
+      </PageContainer>
     );
   }
 
-  return (
-    <div className='container mx-auto p-4 max-w-6xl'>
-      <div
-        id='settingsMessageBox'
-        className='fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50 hidden'
-      ></div>
-      <h1 className='text-3xl font-bold mb-6 text-center text-foreground'>
-        Manage Master Items
-      </h1>
+  const renderSortHeader = ({
+    label,
+    column,
+    className,
+  }: {
+    label: string;
+    column: SortColumn;
+    className?: string;
+  }) => (
+    <button
+      onClick={() => handleSort(column)}
+      className={cn(
+        "inline-flex items-center gap-1 text-left transition-colors hover:text-foreground",
+        sortColumn === column && "text-foreground",
+        className
+      )}
+    >
+      {label}
+      {sortColumn === column &&
+        (sortDirection === "asc" ? (
+          <ArrowUp className='size-3' />
+        ) : (
+          <ArrowDown className='size-3' />
+        ))}
+    </button>
+  );
 
-      {/* Add New Item Form (No changes needed here) */}
-      <div className='bg-background-surface p-6 rounded-lg shadow-md mb-8 border border-border-base'>
-        <h2 className='text-2xl font-semibold mb-4 text-foreground'>
-          Add New Master Item
-        </h2>
-        <form
-          onSubmit={handleAddItem}
-          className='grid grid-cols-1 md:grid-cols-2 gap-4'
-        >
-          {/* ... all form inputs are the same ... */}
-          <div>
-            <label
-              htmlFor='newName'
-              className='block text-text-base text-sm font-bold mb-2'
-            >
-              Name:
-            </label>
-            <input
-              type='text'
-              id='newName'
-              name='name'
-              value={newItemForm.name}
-              onChange={handleNewItemChange}
-              required
-              className='shadow appearance-none border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
-            />
-          </div>
-          <div>
-            <label
-              htmlFor='newUpc'
-              className='block text-text-base text-sm font-bold mb-2'
-            >
-              UPC Number (Optional):
-            </label>
-            <input
-              type='text'
-              id='newUpc'
-              name='upc_number'
-              value={newItemForm.upc_number || ""}
-              onChange={handleNewItemChange}
-              className='shadow appearance-none border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
-            />
-          </div>
-          <div>
-            <label
-              htmlFor='newUnitType'
-              className='block text-text-base text-sm font-bold mb-2'
-            >
-              Count By:
-            </label>
-            <select
-              id='newUnitType'
-              name='unit_type'
-              value={newItemForm.unit_type}
-              onChange={handleNewItemChange}
-              required
-              className='shadow border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
-            >
-              <option value='quantity'>Quantity</option>
-              <option value='weight'>Weight (lbs)</option>
-            </select>
-          </div>
-          {newItemForm.unit_type === "weight" && (
+  return (
+    <PageContainer>
+      <div
+        id='messageBox'
+        className='fixed bottom-4 right-4 z-50 hidden rounded-md border bg-card px-4 py-3 text-sm shadow-lg'
+      ></div>
+
+      <PageHeader
+        title='Items'
+        description='Your master list of products. Items added here can be pulled into any inventory.'
+      />
+
+      {/* Add New Item Form */}
+      <Card className='mb-6'>
+        <CardHeader>
+          <CardTitle>Add item</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={handleAddItem}
+            className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'
+          >
             <div>
-              <label
-                htmlFor='newAvgWeight'
-                className='block text-text-base text-sm font-bold mb-2'
-              >
-                Avg. Weight Per Unit (lbs):
-              </label>
-              <input
-                type='number'
-                id='newAvgWeight'
-                name='average_weight_per_unit'
-                step='0.01'
-                value={newItemForm.average_weight_per_unit || ""}
+              <Label htmlFor='newName'>Name</Label>
+              <Input
+                type='text'
+                id='newName'
+                name='name'
+                value={newItemForm.name}
                 onChange={handleNewItemChange}
-                required={newItemForm.unit_type === "weight"}
-                className='shadow appearance-none border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
+                required
               />
             </div>
-          )}
-          <div>
-            <label
-              htmlFor='newItemType'
-              className='block text-text-base text-sm font-bold mb-2'
-            >
-              Item Type (e.g., Meat):
-            </label>
-            <input
-              type='text'
-              id='newItemType'
-              name='item_type'
-              value={newItemForm.item_type || ""}
-              onChange={handleNewItemChange}
-              className='shadow appearance-none border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
-            />
-          </div>
-          <div>
-            <label
-              htmlFor='newBrand'
-              className='block text-text-base text-sm font-bold mb-2'
-            >
-              Brand (Optional):
-            </label>
-            <input
-              type='text'
-              id='newBrand'
-              name='brand'
-              value={newItemForm.brand || ""}
-              onChange={handleNewItemChange}
-              className='shadow appearance-none border border-border-base rounded w-full py-2 px-3 bg-background text-foreground leading-tight focus:outline-none focus:shadow-outline'
-            />
-          </div>
-          <div className='md:col-span-2 text-right'>
-            <button
-              type='submit'
-              disabled={addItemMutation.isPending}
-              className='bg-primary hover:bg-primary/80 text-text-inverse font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline'
-            >
-              {addItemMutation.isPending ? "Adding..." : "Add Item"}
-            </button>
-          </div>
-        </form>
-      </div>
+            <div>
+              <Label htmlFor='newUpc'>
+                UPC <span className='font-normal text-muted-foreground'>(optional)</span>
+              </Label>
+              <Input
+                type='text'
+                id='newUpc'
+                name='upc_number'
+                value={newItemForm.upc_number || ""}
+                onChange={handleNewItemChange}
+              />
+            </div>
+            <div>
+              <Label htmlFor='newUnitType'>Count by</Label>
+              <Select
+                id='newUnitType'
+                name='unit_type'
+                value={newItemForm.unit_type}
+                onChange={handleNewItemChange}
+                required
+              >
+                <option value='quantity'>Quantity</option>
+                <option value='weight'>Weight (lbs)</option>
+              </Select>
+            </div>
+            {newItemForm.unit_type === "weight" && (
+              <div>
+                <Label htmlFor='newAvgWeight'>Avg. weight per unit (lbs)</Label>
+                <Input
+                  type='number'
+                  id='newAvgWeight'
+                  name='average_weight_per_unit'
+                  step='0.01'
+                  value={newItemForm.average_weight_per_unit || ""}
+                  onChange={handleNewItemChange}
+                  required={newItemForm.unit_type === "weight"}
+                />
+              </div>
+            )}
+            <div>
+              <Label htmlFor='newItemType'>Type</Label>
+              <Input
+                type='text'
+                id='newItemType'
+                name='item_type'
+                placeholder='e.g. Meat'
+                value={newItemForm.item_type || ""}
+                onChange={handleNewItemChange}
+              />
+            </div>
+            <div>
+              <Label htmlFor='newBrand'>
+                Brand <span className='font-normal text-muted-foreground'>(optional)</span>
+              </Label>
+              <Input
+                type='text'
+                id='newBrand'
+                name='brand'
+                value={newItemForm.brand || ""}
+                onChange={handleNewItemChange}
+              />
+            </div>
+            <div className='flex justify-end sm:col-span-2 lg:col-span-3'>
+              <Button type='submit' disabled={addItemMutation.isPending}>
+                <Plus />
+                {addItemMutation.isPending ? "Adding..." : "Add item"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
-      {/* --- NEW RESPONSIVE ITEMS LIST --- */}
-      <div className='bg-background-surface p-4 pt-6 sm:p-6 rounded-lg shadow-md border border-border-base'>
-        <h2 className='text-2xl font-semibold mb-4 text-foreground'>
-          Your Master Items
-        </h2>
+      {/* Items list */}
+      <Card className='overflow-hidden'>
+        <CardHeader>
+          <div>
+            <CardTitle>All items</CardTitle>
+            {paginationInfo?.totalItems != null && (
+              <CardDescription>
+                {paginationInfo.totalItems}{" "}
+                {paginationInfo.totalItems === 1 ? "item" : "items"}
+              </CardDescription>
+            )}
+          </div>
+        </CardHeader>
         {!isLoading && !isError && itemsOnPage.length === 0 ? (
-          <p className='text-text-muted text-center py-8'>
-            No items created yet. Use the form above to add one!
-          </p>
+          <div className='flex flex-col items-center px-5 py-14 text-center'>
+            <span className='mb-3 flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground'>
+              <Package className='size-5' />
+            </span>
+            <p className='text-sm font-medium text-foreground'>No items yet</p>
+            <p className='mt-1 text-sm text-muted-foreground'>
+              Use the form above to add your first item.
+            </p>
+          </div>
         ) : (
           <>
             {/* Header for Desktop View */}
-            <div className='hidden md:grid md:grid-cols-12 gap-4 bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider border-b border-border-base pb-2 pt-5 px-4'>
-              <div
-                className='col-span-3 cursor-pointer'
-                onClick={() => handleSort("name")}
-              >
-                Name{" "}
-                {sortColumn === "name" && (sortDirection === "asc" ? "↑" : "↓")}
-              </div>
-              <div
-                className='col-span-2 cursor-pointer'
-                onClick={() => handleSort("upc_number")}
-              >
-                UPC{" "}
-                {sortColumn === "upc_number" &&
-                  (sortDirection === "asc" ? "↑" : "↓")}
-              </div>
-              <div
-                className='col-span-2 cursor-pointer'
-                onClick={() => handleSort("item_type")}
-              >
-                Type{" "}
-                {sortColumn === "item_type" &&
-                  (sortDirection === "asc" ? "↑" : "↓")}
-              </div>
-              <div
-                className='col-span-2 cursor-pointer'
-                onClick={() => handleSort("brand")}
-              >
-                Brand{" "}
-                {sortColumn === "brand" &&
-                  (sortDirection === "asc" ? "↑" : "↓")}
-              </div>
-              <div className='col-span-3 text-center'>Actions</div>
+            <div className='hidden gap-4 border-b border-border bg-muted/50 px-5 py-2.5 text-xs font-medium text-muted-foreground md:grid md:grid-cols-12'>
+              {renderSortHeader({ label: "Name", column: "name", className: "col-span-3" })}
+              {renderSortHeader({ label: "UPC", column: "upc_number", className: "col-span-2" })}
+              {renderSortHeader({ label: "Type", column: "item_type", className: "col-span-2" })}
+              {renderSortHeader({ label: "Brand", column: "brand", className: "col-span-2" })}
+              <span className='col-span-3 sr-only'>Actions</span>
             </div>
 
-            {/* List of Items (Cards on mobile, Rows on desktop) */}
-            <div className='space-y-4 md:space-y-0'>
+            {/* List of Items (stacked on mobile, rows on desktop) */}
+            <ul className='divide-y divide-border'>
               {sortedItems.map((item) => (
-                <div
+                <li
                   key={item.id}
-                  className='p-4 border rounded-lg bg-background md:grid md:grid-cols-12 md:gap-4 md:items-center md:p-0 md:py-3 md:border-0 md:border-b md:rounded-none'
+                  className='px-5 py-3 transition-colors hover:bg-muted/40 md:grid md:grid-cols-12 md:items-center md:gap-4'
                 >
                   {editingItem && editingItem.id === item.id ? (
                     // Edit Form replaces the item content
-                    <div className='col-span-12 p-4'>
-                      <form
-                        onSubmit={handleUpdateItem}
-                        className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end'
-                      >
-                        <input
-                          type='text'
-                          name='name'
-                          value={editingItem.name}
-                          onChange={handleEditItemChange}
-                          required
-                          placeholder='Name'
-                          className='p-2 border border-border-base rounded bg-background-surface text-foreground w-full'
-                        />
-                        <input
-                          type='text'
-                          name='upc_number'
-                          value={editingItem.upc_number || ""}
-                          onChange={handleEditItemChange}
-                          placeholder='UPC'
-                          className='p-2 border border-border-base rounded bg-background-surface text-foreground w-full'
-                        />
-                        <input
-                          type='text'
-                          name='item_type'
-                          value={editingItem.item_type || ""}
-                          onChange={handleEditItemChange}
-                          placeholder='Item Type'
-                          className='p-2 border border-border-base rounded bg-background-surface text-foreground w-full'
-                        />
-                        <input
-                          type='text'
-                          name='brand'
-                          value={editingItem.brand || ""}
-                          onChange={handleEditItemChange}
-                          placeholder='Brand'
-                          className='p-2 border border-border-base rounded bg-background-surface text-foreground w-full'
-                        />
-                        {/* Actions for the edit form */}
-                        <div className='col-span-full flex justify-end space-x-2 mt-2'>
-                          <button
-                            type='submit'
-                            disabled={updateItemMutation.isPending}
-                            className='bg-success hover:bg-success/80 text-text-inverse text-sm py-1 px-3 rounded'
-                          >
-                            {updateItemMutation.isPending
-                              ? "Saving..."
-                              : "Save"}
-                          </button>
-                          <button
-                            type='button'
-                            onClick={() => setEditingItem(null)}
-                            className='bg-secondary hover:bg-secondary/80 text-text-inverse text-sm py-1 px-3 rounded'
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
-                    </div>
+                    <form
+                      onSubmit={handleUpdateItem}
+                      className='col-span-12 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4'
+                    >
+                      <Input
+                        type='text'
+                        name='name'
+                        value={editingItem.name}
+                        onChange={handleEditItemChange}
+                        required
+                        placeholder='Name'
+                        aria-label='Name'
+                      />
+                      <Input
+                        type='text'
+                        name='upc_number'
+                        value={editingItem.upc_number || ""}
+                        onChange={handleEditItemChange}
+                        placeholder='UPC'
+                        aria-label='UPC'
+                      />
+                      <Input
+                        type='text'
+                        name='item_type'
+                        value={editingItem.item_type || ""}
+                        onChange={handleEditItemChange}
+                        placeholder='Type'
+                        aria-label='Type'
+                      />
+                      <Input
+                        type='text'
+                        name='brand'
+                        value={editingItem.brand || ""}
+                        onChange={handleEditItemChange}
+                        placeholder='Brand'
+                        aria-label='Brand'
+                      />
+                      <div className='col-span-full flex justify-end gap-2'>
+                        <Button
+                          type='button'
+                          variant='outline'
+                          size='sm'
+                          onClick={() => setEditingItem(null)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type='submit'
+                          size='sm'
+                          disabled={updateItemMutation.isPending}
+                        >
+                          {updateItemMutation.isPending ? "Saving..." : "Save"}
+                        </Button>
+                      </div>
+                    </form>
                   ) : (
-                    // Display Item content
                     <>
-                      <div className='flex justify-between items-center md:col-span-3 md:px-4'>
-                        <span className='font-bold text-sm text-text-muted md:hidden'>
-                          Name
-                        </span>
-                        <span className='text-right md:text-left font-semibold'>
-                          {item.name}
-                        </span>
-                      </div>
-                      <div className='flex justify-between items-center border-t pt-2 mt-2 md:border-0 md:pt-0 md:mt-0 md:col-span-2 md:px-4'>
-                        <span className='font-bold text-sm text-text-muted md:hidden'>
-                          UPC
-                        </span>
-                        <span className='text-right md:text-left text-text-muted'>
-                          {item.upc_number || "-"}
-                        </span>
-                      </div>
-                      <div className='flex justify-between items-center border-t pt-2 mt-2 md:border-0 md:pt-0 md:mt-0 md:col-span-2 md:px-4'>
-                        <span className='font-bold text-sm text-text-muted md:hidden'>
-                          Type
-                        </span>
-                        <span className='text-right md:text-left capitalize'>
-                          {item.item_type || "-"}
-                        </span>
-                      </div>
-                      <div className='flex justify-between items-center border-t pt-2 mt-2 md:border-0 md:pt-0 md:mt-0 md:col-span-2 md:px-4'>
-                        <span className='font-bold text-sm text-text-muted md:hidden'>
-                          Brand
-                        </span>
-                        <span className='text-right md:text-left text-text-muted'>
-                          {item.brand || "-"}
-                        </span>
-                      </div>
-                      <div className='border-t pt-4 mt-4 md:border-0 md:pt-0 md:mt-0 md:col-span-3 md:px-4'>
-                        <div className='flex flex-col sm:flex-row items-center justify-center gap-2'>
-                          <button
-                            onClick={() => setEditingItem(item)}
-                            className='bg-accent hover:bg-accent/80 text-text-inverse text-sm py-1 px-2 rounded w-full sm:w-auto'
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteItem(item.id)}
-                            className='bg-error hover:bg-error/80 text-text-inverse text-sm py-1 px-2 rounded w-full sm:w-auto'
-                          >
-                            Delete
-                          </button>
+                      <div className='flex items-start justify-between gap-3 md:col-span-3'>
+                        <div className='min-w-0'>
+                          <p className='truncate text-sm font-medium text-foreground'>
+                            {item.name}
+                          </p>
+                          <p className='mt-0.5 truncate text-xs capitalize text-muted-foreground md:hidden'>
+                            {[item.item_type, item.brand, item.upc_number]
+                              .filter(Boolean)
+                              .join(" · ") || "—"}
+                          </p>
                         </div>
+                        <Badge className='md:hidden'>{item.unit_type}</Badge>
+                      </div>
+                      <span className='hidden truncate font-mono text-xs text-muted-foreground md:col-span-2 md:block'>
+                        {item.upc_number || "—"}
+                      </span>
+                      <span className='hidden truncate text-sm capitalize text-muted-foreground md:col-span-2 md:block'>
+                        {item.item_type || "—"}
+                      </span>
+                      <span className='hidden truncate text-sm text-muted-foreground md:col-span-2 md:block'>
+                        {item.brand || "—"}
+                      </span>
+                      <div className='mt-2 flex justify-end gap-1 md:col-span-3 md:mt-0'>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          onClick={() => setEditingItem(item)}
+                        >
+                          <Pencil />
+                          Edit
+                        </Button>
+                        <Button
+                          variant='ghost-destructive'
+                          size='sm'
+                          onClick={() => handleDeleteItem(item.id)}
+                        >
+                          <Trash2 />
+                          Delete
+                        </Button>
                       </div>
                     </>
                   )}
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
 
-            {/* NEW PAGINATION CONTROLS */}
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
@@ -621,7 +572,7 @@ export default function SettingsPage() {
             />
           </>
         )}
-      </div>
-    </div>
+      </Card>
+    </PageContainer>
   );
 }

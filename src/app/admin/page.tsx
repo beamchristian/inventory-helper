@@ -13,12 +13,24 @@ import {
   AdminUser,
   NewUserPayload,
 } from "@/hooks/useAdmin";
+import Modal from "@/components/Modal";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/button";
+import { Input, Label, Select } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PageContainer, PageHeader } from "@/components/ui/page-header";
+import { ArrowRight, Copy, Trash2, UserPlus } from "lucide-react";
 
-const LoadingSpinner = () => (
-  <div className='flex justify-center items-center h-20'>
-    <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
-  </div>
-);
+// TEAM_MEMBER -> "Team member"
+const formatRole = (role: string) =>
+  role.charAt(0) + role.slice(1).toLowerCase().replace(/_/g, " ");
 
 const AdminPage = () => {
   const { data: session, status } = useSession();
@@ -55,9 +67,7 @@ const AdminPage = () => {
 
   if (status !== "authenticated" || session?.user?.role !== "ADMIN") {
     return (
-      <div className='min-h-screen flex items-center justify-center'>
-        <LoadingSpinner />
-      </div>
+      <LoadingSpinner className='min-h-[60vh]' />
     );
   }
 
@@ -134,214 +144,212 @@ const AdminPage = () => {
   };
 
   return (
-    <div className='container mx-auto p-4 max-w-4xl'>
-      <h1 className='text-3xl font-bold mb-6 text-foreground'>
-        Admin Dashboard
-      </h1>
+    <PageContainer>
+      <PageHeader
+        title='Admin'
+        description='Manage user accounts and share item lists between users.'
+        actions={
+          <Button onClick={() => setCreateModalOpen(true)}>
+            <UserPlus />
+            New user
+          </Button>
+        }
+      />
 
-      <div className='bg-background-surface p-6 rounded-lg shadow-md mb-8'>
-        <h2 className='text-2xl font-semibold text-foreground mb-4'>
-          Copy Master Items
-        </h2>
-        <p className='text-sm text-text-muted mb-4'>
-          This action will create a copy of all master items from a source user
-          and assign them to a target user. The source user&apos;s items will
-          not be affected.
-        </p>
-        <div className='grid grid-cols-1 md:grid-cols-3 gap-4 items-end'>
+      <Card className='mb-6 overflow-hidden'>
+        <CardHeader>
           <div>
-            <label
-              htmlFor='sourceUser'
-              className='block text-text-base text-sm font-medium mb-1'
-            >
-              From User (Source)
-            </label>
-            <select
+            <CardTitle>Users</CardTitle>
+            {users && (
+              <CardDescription>
+                {users.length} {users.length === 1 ? "account" : "accounts"}
+              </CardDescription>
+            )}
+          </div>
+        </CardHeader>
+
+        {isLoading && <LoadingSpinner />}
+        {isError && (
+          <p className='p-5 text-sm text-destructive'>Failed to load users.</p>
+        )}
+
+        <div className='overflow-x-auto'>
+          <table className='w-full text-sm'>
+            <thead className='border-b border-border bg-muted/50 text-left text-xs text-muted-foreground'>
+              <tr>
+                <th className='px-5 py-2.5 font-medium'>Name</th>
+                <th className='px-5 py-2.5 font-medium'>Email</th>
+                <th className='px-5 py-2.5 font-medium'>Role</th>
+                <th className='px-5 py-2.5 font-medium'>
+                  <span className='sr-only'>Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className='divide-y divide-border'>
+              {users?.map((user: AdminUser) => {
+                const isSelf = user.id === session?.user.id;
+                return (
+                  <tr
+                    key={user.id}
+                    className='transition-colors hover:bg-muted/40'
+                  >
+                    <td className='whitespace-nowrap px-5 py-2.5 font-medium text-foreground'>
+                      {user.name}
+                      {isSelf && (
+                        <Badge variant='primary' className='ml-2 normal-case'>
+                          You
+                        </Badge>
+                      )}
+                    </td>
+                    <td className='px-5 py-2.5 text-muted-foreground'>
+                      {user.email}
+                    </td>
+                    <td className='px-5 py-2.5'>
+                      <Select
+                        value={user.role}
+                        onChange={(e) =>
+                          handleRoleChange(user.id, e.target.value as Role)
+                        }
+                        disabled={isSelf || updateUserRoleMutation.isPending}
+                        className='h-8 w-40'
+                        aria-label={`Role for ${user.name}`}
+                      >
+                        {Object.values(Role).map((role) => (
+                          <option key={role} value={role}>
+                            {formatRole(role)}
+                          </option>
+                        ))}
+                      </Select>
+                    </td>
+                    <td className='px-5 py-2.5 text-right'>
+                      <Button
+                        variant='ghost-destructive'
+                        size='icon-sm'
+                        onClick={() => handleDeleteUser(user.id)}
+                        disabled={isSelf || deleteUserMutation.isPending}
+                        title='Delete user'
+                        aria-label={`Delete ${user.name}`}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle>Copy items between users</CardTitle>
+            <CardDescription>
+              Copies every master item from the source user to the target
+              user. The source user&apos;s items are not changed.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className='grid grid-cols-1 items-end gap-4 md:grid-cols-[1fr_auto_1fr_auto]'>
+          <div>
+            <Label htmlFor='sourceUser'>From</Label>
+            <Select
               id='sourceUser'
               value={sourceUserId}
               onChange={(e) => setSourceUserId(e.target.value)}
-              className='w-full p-2 border border-border-base rounded bg-background text-foreground'
             >
-              <option value=''>Select Source...</option>
+              <option value=''>Select source user…</option>
               {users?.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.name} ({user.email})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
+          <ArrowRight className='mb-2.5 hidden size-4 text-muted-foreground md:block' />
           <div>
-            <label
-              htmlFor='targetUser'
-              className='block text-text-base text-sm font-medium mb-1'
-            >
-              To User (Target)
-            </label>
-            <select
+            <Label htmlFor='targetUser'>To</Label>
+            <Select
               id='targetUser'
               value={targetUserId}
               onChange={(e) => setTargetUserId(e.target.value)}
-              className='w-full p-2 border border-border-base rounded bg-background text-foreground'
             >
-              <option value=''>Select Target...</option>
+              <option value=''>Select target user…</option>
               {users?.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.name} ({user.email})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
-          <button
+          <Button
+            variant='outline'
             onClick={handleCopy}
             disabled={
               !sourceUserId || !targetUserId || copyItemsMutation.isPending
             }
-            className='bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-4 rounded disabled:opacity-50'
           >
-            {copyItemsMutation.isPending ? "Copying..." : "Copy Items"}
-          </button>
-        </div>
-      </div>
+            <Copy />
+            {copyItemsMutation.isPending ? "Copying..." : "Copy items"}
+          </Button>
+        </CardContent>
+      </Card>
 
-      <div className='bg-background-surface p-6 rounded-lg shadow-md'>
-        <div className='flex justify-between items-center mb-4'>
-          <h2 className='text-2xl font-semibold text-foreground'>
-            Manage Users
-          </h2>
-          <button
-            onClick={() => setCreateModalOpen(true)}
-            className='bg-primary hover:bg-primary/80 text-text-inverse font-bold py-2 px-4 rounded'
-          >
-            Create New User
-          </button>
-        </div>
-
-        {isLoading && <LoadingSpinner />}
-        {isError && <p className='text-error'>Failed to load users.</p>}
-
-        <div className='overflow-x-auto'>
-          <table className='min-w-full bg-background'>
-            <thead>
-              <tr className='bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider'>
-                <th className='py-3 px-4'>Name</th>
-                <th className='py-3 px-4'>Email</th>
-                <th className='py-3 px-4'>Role</th>
-                <th className='py-3 px-4 text-center'>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users?.map((user: AdminUser) => (
-                <tr
-                  key={user.id}
-                  className='border-b border-border-base hover:bg-background-base'
-                >
-                  <td className='py-2 px-4 text-foreground'>{user.name}</td>
-                  <td className='py-2 px-4 text-text-muted'>{user.email}</td>
-                  <td className='py-2 px-4'>
-                    <select
-                      value={user.role}
-                      onChange={(e) =>
-                        handleRoleChange(user.id, e.target.value as Role)
-                      }
-                      disabled={
-                        user.id === session?.user.id ||
-                        updateUserRoleMutation.isPending
-                      }
-                      className='p-1 border border-border-base rounded bg-background text-foreground'
-                    >
-                      {Object.values(Role).map((role) => (
-                        <option key={role} value={role}>
-                          {role}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className='py-2 px-4 text-center'>
-                    <button
-                      onClick={() => handleDeleteUser(user.id)}
-                      disabled={
-                        user.id === session?.user.id ||
-                        deleteUserMutation.isPending
-                      }
-                      className='text-error hover:text-error/80 text-sm disabled:opacity-50'
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {isCreateModalOpen && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50'>
-          <div className='bg-background-surface p-8 rounded-lg shadow-xl w-full max-w-md'>
-            <h3 className='text-2xl font-bold mb-4'>Create New User</h3>
-            <form onSubmit={handleCreateUser}>
-              <div className='mb-4'>
-                <label className='block text-text-base mb-1'>Full Name</label>
-                <input
-                  name='name'
-                  type='text'
-                  required
-                  className='w-full p-2 border rounded bg-background text-foreground'
-                />
-              </div>
-              <div className='mb-4'>
-                <label className='block text-text-base mb-1'>Email</label>
-                <input
-                  name='email'
-                  type='email'
-                  required
-                  className='w-full p-2 border rounded bg-background text-foreground'
-                />
-              </div>
-              <div className='mb-4'>
-                <label className='block text-text-base mb-1'>Password</label>
-                <input
-                  name='password'
-                  type='password'
-                  required
-                  className='w-full p-2 border rounded bg-background text-foreground'
-                />
-              </div>
-              <div className='mb-6'>
-                <label className='block text-text-base mb-1'>Role</label>
-                <select
-                  name='role'
-                  defaultValue={Role.TEAM_MEMBER}
-                  className='w-full p-2 border rounded bg-background text-foreground'
-                >
-                  {Object.values(Role).map((role) => (
-                    <option key={role} value={role}>
-                      {role}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className='flex justify-end gap-4'>
-                <button
-                  type='button'
-                  onClick={() => setCreateModalOpen(false)}
-                  className='bg-secondary text-text-inverse px-4 py-2 rounded'
-                >
-                  Cancel
-                </button>
-                <button
-                  type='submit'
-                  disabled={createUserMutation.isPending}
-                  className='bg-primary text-text-inverse px-4 py-2 rounded'
-                >
-                  {createUserMutation.isPending ? "Creating..." : "Create User"}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        title='New user'
+        description='They can sign in with this email and password.'
+      >
+        <form onSubmit={handleCreateUser} className='space-y-4'>
+          <div>
+            <Label htmlFor='newUserName'>Full name</Label>
+            <Input id='newUserName' name='name' type='text' required />
           </div>
-        </div>
-      )}
-    </div>
+          <div>
+            <Label htmlFor='newUserEmail'>Email</Label>
+            <Input id='newUserEmail' name='email' type='email' required />
+          </div>
+          <div>
+            <Label htmlFor='newUserPassword'>Password</Label>
+            <Input
+              id='newUserPassword'
+              name='password'
+              type='password'
+              autoComplete='new-password'
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor='newUserRole'>Role</Label>
+            <Select
+              id='newUserRole'
+              name='role'
+              defaultValue={Role.TEAM_MEMBER}
+            >
+              {Object.values(Role).map((role) => (
+                <option key={role} value={role}>
+                  {formatRole(role)}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className='flex justify-end gap-2 pt-2'>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => setCreateModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button type='submit' disabled={createUserMutation.isPending}>
+              {createUserMutation.isPending ? "Creating..." : "Create user"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </PageContainer>
   );
 };
 

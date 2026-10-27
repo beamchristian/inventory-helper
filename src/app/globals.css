@@ -1,126 +1,117 @@
 @import "tailwindcss";
 
 :root {
-  /* --- Light Mode Colors (Defaults) --- */
-  /* Backgrounds & Foreground */
-  --background: hsl(0 0% 98%); /* Off-white, very subtle warmth for main body */
-  --foreground: hsl(
-    220 15% 20%
-  ); /* Dark charcoal for general text, soft contrast */
+  /* Surfaces */
+  --background: hsl(240 5% 97%);
+  --foreground: hsl(240 10% 10%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(240 10% 10%);
+  --muted: hsl(240 5% 95%);
+  --muted-foreground: hsl(240 4% 42%);
 
-  /* Brand / Interactive Colors */
-  --primary: hsl(
-    200 60% 40%
-  ); /* A calm, deep teal/blue for primary actions/links */
-  --secondary: hsl(
-    220 10% 50%
-  ); /* A medium gray for secondary elements/borders */
-  --accent: hsl(
-    150 50% 45%
-  ); /* NEW: A soft, inviting green for accents/highlights */
+  /* Lines */
+  --border: hsl(240 6% 90%);
+  --input: hsl(240 6% 84%);
+  --ring: hsl(222 76% 48%);
 
-  /* Text Colors */
-  --text-base: hsl(
-    220 15% 20%
-  ); /* General text on light backgrounds (same as foreground) */
-  --text-muted: hsl(
-    220 10% 40%
-  ); /* Muted text on light backgrounds, softer gray */
-  --text-inverse: hsl(0 0% 100%); /* Text for dark backgrounds (pure white) */
+  /* Brand / interactive */
+  --primary: hsl(222 76% 48%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(240 5% 94%);
+  --secondary-foreground: hsl(240 6% 15%);
+  --accent: hsl(240 5% 94%);
+  --accent-foreground: hsl(240 6% 15%);
 
-  /* Background Colors */
-  --background-base: hsl(
-    0 0% 96%
-  ); /* Main page background, slightly darker than --background */
-  --background-surface: hsl(0 0% 100%); /* For cards, panels, pure white */
+  /* States */
+  --destructive: hsl(0 72% 50%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(152 60% 34%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(36 92% 42%);
+  --warning-foreground: hsl(0 0% 100%);
+}
 
-  /* Border Colors */
-  --border-base: hsl(210 10% 85%); /* General border, light gray */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: hsl(240 8% 7%);
+    --foreground: hsl(240 5% 92%);
+    --card: hsl(240 6% 10%);
+    --card-foreground: hsl(240 5% 92%);
+    --muted: hsl(240 5% 15%);
+    --muted-foreground: hsl(240 5% 64%);
 
-  /* Specific states */
-  --success: hsl(
-    140 60% 38%
-  ); /* A grounded, slightly muted green for success */
-  --error: hsl(350 70% 50%); /* A clear, not overly bright red for errors */
-  --warning: hsl(40 90% 55%); /* A warm, clear yellow/orange for warnings */
+    --border: hsl(240 4% 18%);
+    --input: hsl(240 4% 24%);
+    --ring: hsl(217 85% 60%);
+
+    --primary: hsl(217 85% 58%);
+    --primary-foreground: hsl(0 0% 100%);
+    --secondary: hsl(240 4% 16%);
+    --secondary-foreground: hsl(240 5% 92%);
+    --accent: hsl(240 4% 16%);
+    --accent-foreground: hsl(240 5% 92%);
+
+    --destructive: hsl(0 70% 58%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --success: hsl(152 55% 42%);
+    --success-foreground: hsl(0 0% 100%);
+    --warning: hsl(38 90% 52%);
+    --warning-foreground: hsl(240 8% 7%);
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
   --color-accent: var(--accent);
-
-  /* New assignments based on your added variables */
-  --color-text-base: var(--text-base);
-  --color-text-muted: var(--text-muted);
-  --color-text-inverse: var(--text-inverse);
-
-  --color-background-base: var(--background-base);
-  --color-background-surface: var(--background-surface);
-
-  --color-border-base: var(--border-base);
-
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
-  --color-error: var(--error);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Legacy aliases kept so older class names still resolve */
+  --color-background-base: var(--background);
+  --color-background-surface: var(--card);
+  --color-text-base: var(--foreground);
+  --color-text-muted: var(--muted-foreground);
+  --color-text-inverse: var(--primary-foreground);
+  --color-border-base: var(--border);
+  --color-error: var(--destructive);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* --- GitHub-like Dark Mode Colors (HSL) --- */
-    /* Hue values are chosen to be slightly cool/bluish-gray */
-
-    --background: hsl(
-      210 12% 8%
-    ); /* Main very dark background, subtle blue tint */
-    --foreground: hsl(
-      210 20% 90%
-    ); /* Light, slightly desaturated text for good readability */
-
-    --primary: hsl(
-      207 90% 65%
-    ); /* Vibrant, but not electric, blue for primary actions/links */
-    --secondary: hsl(210 10% 60%); /* Muted gray for secondary text/elements */
-    --accent: hsl(40 80% 55%); /* A specific gold/orange for accents */
-
-    /* Text Colors */
-    --text-base: hsl(210 20% 90%); /* General text on dark backgrounds */
-    --text-muted: hsl(210 10% 55%); /* Muted text, slightly darker than base */
-    --text-inverse: hsl(
-      210 12% 8%
-    ); /* Dark text for elements that might be light on a dark page */
-
-    /* Background Colors */
-    --background-base: hsl(
-      210 12% 12%
-    ); /* Slightly lighter dark for main content areas */
-    --background-surface: hsl(
-      210 12% 18%
-    ); /* Even lighter dark for cards, panels, or nested elements */
-
-    /* Border Colors */
-    --border-base: hsl(210 10% 30%); /* Dark, subtle border color */
-
-    /* Specific states */
-    --success: hsl(
-      140 70% 45%
-    ); /* A clear, slightly desaturated green for success */
-    --error: hsl(
-      0 75% 55%
-    ); /* A distinct, slightly desaturated red for errors */
-    --warning: hsl(
-      40 85% 50%
-    ); /* A warning yellow/orange, similar to accent but perhaps slightly less vibrant */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
 }

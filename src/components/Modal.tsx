@@ -1,14 +1,22 @@
 // src/components/Modal.tsx
 import React, { useRef, useEffect } from "react";
+import { X } from "lucide-react";
 
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  description?: string;
   children: React.ReactNode;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+const Modal: React.FC<ModalProps> = ({
+  isOpen,
+  onClose,
+  title,
+  description,
+  children,
+}) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
   // Close modal on escape key press
@@ -39,26 +47,36 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
 
   return (
     <div
-      className='fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50'
+      className='fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]'
       onClick={handleClickOutside}
     >
       <div
         ref={modalRef}
-        className='bg-white rounded-lg shadow-xl max-w-lg w-full p-6 m-4 relative'
+        className='relative w-full max-w-md rounded-lg border border-border bg-card p-6 text-card-foreground shadow-xl'
         role='dialog'
         aria-modal='true'
         aria-labelledby='modal-title'
       >
-        <div className='flex justify-between items-center mb-4'>
-          <h2 id='modal-title' className='text-2xl font-semibold text-gray-900'>
-            {title}
-          </h2>
+        <div className='mb-5 flex items-start justify-between gap-4'>
+          <div>
+            <h2
+              id='modal-title'
+              className='text-lg font-semibold text-foreground'
+            >
+              {title}
+            </h2>
+            {description && (
+              <p className='mt-1 text-sm text-muted-foreground'>
+                {description}
+              </p>
+            )}
+          </div>
           <button
             onClick={onClose}
-            className='text-gray-500 hover:text-gray-700 text-3xl leading-none'
+            className='rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground'
             aria-label='Close modal'
           >
-            &times;
+            <X className='size-4' />
           </button>
         </div>
         <div className='modal-content'>{children}</div>

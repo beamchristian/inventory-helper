@@ -6,7 +6,7 @@ import { auth } from "@/lib/auth";
 import Providers from "@/components/Providers";
 import { Metadata, Viewport } from "next";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 const APP_NAME = "Inventory Helper";
 const APP_DEFAULT_TITLE = "Inventory Helper";
@@ -43,7 +43,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#FFFFFF",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FFFFFF" },
+    { media: "(prefers-color-scheme: dark)", color: "#18181B" },
+  ],
 };
 
 export default async function RootLayout({
@@ -55,10 +58,10 @@ export default async function RootLayout({
 
   return (
     <html lang='en'>
-      <body className={inter.className}>
+      <body className={`${inter.variable} font-sans`}>
         <Providers session={session}>
-          <Header />
-          <div className='min-h-screen bg-background-surface flex flex-col'>
+          <div className='flex min-h-screen flex-col bg-background'>
+            <Header />
             <div className='flex-grow'>{children}</div>
           </div>
         </Providers>

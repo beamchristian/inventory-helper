@@ -3,12 +3,13 @@
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Boxes, Download, LogOut, Menu, Share, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 // ** InstallAppControl (With Installed Check) **
-// In your Header.tsx file
-
-function InstallAppControl() {
+function InstallAppControl({ showLabel = false }: { showLabel?: boolean }) {
   // This state controls the pop-up's visibility. It starts as false.
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
@@ -29,7 +30,7 @@ function InstallAppControl() {
     return () => {
       window.removeEventListener(
         "beforeinstallprompt",
-        handleBeforeInstallPrompt
+        handleBeforeInstallPrompt,
       );
     };
   }, []);
@@ -58,203 +59,194 @@ function InstallAppControl() {
   }
 
   return (
-    // Add `relative` to position the pop-up correctly
-    <div className='relative flex flex-col items-center'>
-      <button onClick={handleInstallClick} title='Install App'>
-        📱
-      </button>
+    // `relative` positions the pop-up correctly
+    <div className='relative'>
+      <Button
+        variant='ghost'
+        size={showLabel ? "default" : "icon"}
+        onClick={handleInstallClick}
+        title='Install app'
+        aria-label='Install app'
+        className={cn(showLabel && "w-full justify-start")}
+      >
+        <Download />
+        {showLabel && "Install app"}
+      </Button>
 
-      {/* This JSX block is now correctly rendered ONLY when showIOSInstructions is true */}
       {showIOSInstructions && (
-        <div className='absolute top-full right-0 mt-2 w-64 p-4 bg-white dark:bg-gray-900 border dark:border-gray-700 rounded-lg shadow-xl z-20'>
-          <h3 className='text-md font-bold mb-2 text-center text-gray-900 dark:text-white'>
-            Install App Phone
-          </h3>
-          <ol className='list-decimal list-inside text-sm space-y-2 text-gray-700 dark:text-gray-300'>
-            <li>Tap the **Share** button in your browser&apos;s menu.</li>
+        <div className='absolute right-0 top-full z-20 mt-2 w-64 rounded-lg border border-border bg-card p-4 text-card-foreground shadow-lg'>
+          <h3 className='mb-2 text-sm font-semibold'>Install on your phone</h3>
+          <ol className='list-inside list-decimal space-y-1.5 text-sm text-muted-foreground'>
             <li>
-              Scroll down and tap on &apos;**Add to Home Screen**&apos; ➕.
+              Tap the <Share className='inline size-3.5 align-[-2px]' />{" "}
+              <span className='font-medium text-foreground'>Share</span> button.
+            </li>
+            <li>
+              Choose{" "}
+              <span className='font-medium text-foreground'>
+                Add to Home Screen
+              </span>
+              .
             </li>
           </ol>
-          {/* This button sets the state to false, hiding the pop-up */}
-          <button
+          <Button
+            variant='secondary'
+            size='sm'
+            className='mt-4 w-full'
             onClick={() => setShowIOSInstructions(false)}
-            className='w-full mt-4 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600'
           >
-            Got It
-          </button>
+            Got it
+          </Button>
         </div>
       )}
     </div>
   );
 }
 
-// --- SVG ICONS ---
-const MenuIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...props}
-    xmlns='http://www.w3.org/2000/svg'
-    width='24'
-    height='24'
-    viewBox='0 0 24 24'
-    fill='none'
-    stroke='currentColor'
-    strokeWidth='2'
-    strokeLinecap='round'
-    strokeLinejoin='round'
-  >
-    <line x1='4' x2='20' y1='12' y2='12' />
-    <line x1='4' x2='20' y1='6' y2='6' />
-    <line x1='4' x2='20' y1='18' y2='18' />
-  </svg>
-);
-const CloseIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    {...props}
-    xmlns='http://www.w3.org/2000/svg'
-    width='24'
-    height='24'
-    viewBox='0 0 24 24'
-    fill='none'
-    stroke='currentColor'
-    strokeWidth='2'
-    strokeLinecap='round'
-    strokeLinejoin='round'
-  >
-    <path d='M18 6 6 18' />
-    <path d='m6 6 12 12' />
-  </svg>
-);
+const NAV_LINKS = [
+  { href: "/", label: "Inventories" },
+  { href: "/settings", label: "Items" },
+];
+
+function getInitials(value: string) {
+  const parts = value.split(/[\s@.]+/).filter(Boolean);
+  return (parts[0]?.[0] ?? "?").concat(parts[1]?.[0] ?? "").toUpperCase();
+}
 
 // --- MAIN HEADER COMPONENT ---
 export default function Header() {
   const { data, status } = useSession();
+  const pathname = usePathname();
   const userIdentifier = data?.user?.name || data?.user?.email;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAdmin = data?.user?.role === "ADMIN";
 
+  const links = isAdmin
+    ? [...NAV_LINKS, { href: "/admin", label: "Admin" }]
+    : NAV_LINKS;
+
+  const isActive = (href: string) =>
+    href === "/"
+      ? pathname === "/" || pathname.startsWith("/inventories")
+      : pathname.startsWith(href);
+
   return (
-    <header className='bg-primary text-primary-foreground shadow-md relative'>
-      <div className='container mx-auto flex justify-between items-center p-4'>
-        <Link href='/' className='text-2xl font-bold hover:text-white/90'>
-          Inventory App
-        </Link>
-        <nav className='hidden md:flex items-center gap-x-4'>
+    <header className='sticky top-0 z-40 border-b border-border bg-card/90 backdrop-blur supports-[backdrop-filter]:bg-card/75'>
+      <div className='mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6'>
+        <div className='flex items-center gap-8'>
+          <Link
+            href='/'
+            className='flex items-center gap-2 font-semibold text-foreground'
+          >
+            <span className='flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground'>
+              <Boxes className='size-4' />
+            </span>
+            <span>Inventory Helper</span>
+          </Link>
+
           {status === "authenticated" && (
-            <>
-              <Link href='/' className='hover:text-white/90 transition-colors'>
-                My Inventories
-              </Link>
-              <Link
-                href='/settings'
-                className='hover:text-white/90 transition-colors'
-              >
-                Settings
-              </Link>
-              {isAdmin && (
+            <nav className='hidden items-center gap-1 md:flex'>
+              {links.map((link) => (
                 <Link
-                  href='/admin'
-                  className='font-semibold text-accent-foreground hover:text-white/90 transition-colors'
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    isActive(link.href)
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                 >
-                  Admin
+                  {link.label}
                 </Link>
-              )}
-              <div className='flex items-center gap-x-2 ml-4'>
-                <InstallAppControl />
-              </div>
-              {userIdentifier && (
-                <span
-                  className='font-semibold truncate max-w-40'
-                  title={userIdentifier}
-                >
-                  {userIdentifier}
-                </span>
-              )}
-              <Button variant='secondary' onClick={() => signOut()}>
-                Sign Out
-              </Button>
-            </>
-          )}
-          {status === "unauthenticated" && (
-            <Link
-              href='/sign-in'
-              className='hover:text-white/90 transition-colors'
-            >
-              Sign In
-            </Link>
-          )}
-        </nav>
-        <div className='md:hidden'>
-          {status === "authenticated" && (
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label='Toggle mobile menu'
-              className='p-1'
-            >
-              {isMenuOpen ? <CloseIcon /> : <MenuIcon />}
-            </button>
-          )}
-          {status === "unauthenticated" && (
-            <Link
-              href='/sign-in'
-              className='hover:text-white/90 transition-colors'
-            >
-              Sign In
-            </Link>
+              ))}
+            </nav>
           )}
         </div>
-      </div>
-      {isMenuOpen && status === "authenticated" && (
-        <nav className='md:hidden bg-primary shadow-lg absolute top-full left-0 w-full'>
-          <div className='container mx-auto flex flex-col items-start p-4 gap-4'>
-            <Link
-              href='/'
-              className='hover:text-white/90 transition-colors w-full'
-              onClick={() => setIsMenuOpen(false)}
-            >
-              My Inventories
-            </Link>
-            <Link
-              href='/settings'
-              className='hover:text-white/90 transition-colors w-full'
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Settings
-            </Link>
-            {isAdmin && (
-              <Link
-                href='/admin'
-                className='font-semibold text-accent-foreground hover:text-white/90 transition-colors w-full'
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Admin
-              </Link>
-            )}
-            <div className='border-t border-primary-foreground/20 w-full my-2'></div>
-            <div className='flex items-center justify-around w-full'>
-              <div className='text-center'>
-                <p className='text-sm'>Install App</p>
-                <InstallAppControl />
-              </div>
-            </div>
-            <div className='border-t border-primary-foreground/20 w-full my-2'></div>
+
+        {status === "authenticated" && (
+          <div className='hidden items-center gap-2 md:flex'>
+            <InstallAppControl />
             {userIdentifier && (
-              <span
-                className='font-semibold truncate w-full'
+              <div
+                className='flex items-center gap-2 pl-2 text-sm'
                 title={userIdentifier}
               >
-                {userIdentifier}
-              </span>
+                <span className='flex size-7 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground'>
+                  {getInitials(userIdentifier)}
+                </span>
+                <span className='max-w-40 truncate font-medium text-foreground'>
+                  {userIdentifier}
+                </span>
+              </div>
+            )}
+            <Button variant='ghost' size='sm' onClick={() => signOut()}>
+              <LogOut />
+              Sign out
+            </Button>
+          </div>
+        )}
+
+        {status === "unauthenticated" && pathname !== "/sign-in" && (
+          <Button asChild variant='outline' size='sm'>
+            <Link href='/sign-in'>Sign in</Link>
+          </Button>
+        )}
+
+        {status === "authenticated" && (
+          <Button
+            variant='ghost'
+            size='icon'
+            className='md:hidden'
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label='Toggle mobile menu'
+          >
+            {isMenuOpen ? <X /> : <Menu />}
+          </Button>
+        )}
+      </div>
+
+      {isMenuOpen && status === "authenticated" && (
+        <nav className='absolute left-0 top-full w-full border-b border-border bg-card shadow-md md:hidden'>
+          <div className='mx-auto flex max-w-6xl flex-col gap-1 p-3'>
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setIsMenuOpen(false)}
+                className={cn(
+                  "rounded-md px-3 py-2 text-sm font-medium",
+                  isActive(link.href)
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground",
+                )}
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className='my-2 border-t border-border' />
+            <InstallAppControl showLabel />
+            {userIdentifier && (
+              <p
+                className='truncate px-3 py-2 text-sm text-muted-foreground'
+                title={userIdentifier}
+              >
+                Signed in as{" "}
+                <span className='font-medium text-foreground'>
+                  {userIdentifier}
+                </span>
+              </p>
             )}
             <Button
-              variant='secondary'
+              variant='outline'
               className='w-full'
               onClick={() => {
                 signOut();
                 setIsMenuOpen(false);
               }}
             >
-              Sign Out
+              <LogOut />
+              Sign out
             </Button>
           </div>
         </nav>

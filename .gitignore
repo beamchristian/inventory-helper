@@ -48,3 +48,8 @@ next-env.d.ts
 /prisma/dev.db
 /prisma/dev.db-journal
 prisma/seed.ts
+
+# Claude Code (local only, never commit)
+.claude/
+CLAUDE.md
+CLAUDE.local.md

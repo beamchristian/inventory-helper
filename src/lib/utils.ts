@@ -101,6 +101,15 @@ export const calculateWeight = (invItem: CombinedInventoryItem): number => {
   );
 };
 
+// Toast styling shared by every page's message box element
+export const toastBaseClasses =
+  "fixed bottom-4 right-4 z-50 max-w-sm rounded-md border bg-card px-4 py-3 text-sm font-medium shadow-lg";
+const toastTypeClasses = {
+  info: "border-border text-foreground",
+  success: "border-success/30 text-success",
+  error: "border-destructive/30 text-destructive",
+};
+
 export const showMessage = (
   message: string,
   type: "info" | "error" | "success" = "info"
@@ -108,11 +117,7 @@ export const showMessage = (
   const messageBox = document.getElementById("messageBox");
   if (messageBox) {
     messageBox.innerText = message;
-    messageBox.className = `fixed top-4 right-4 p-3 rounded-lg shadow-lg z-50 block `;
-    if (type === "error") messageBox.classList.add("bg-red-500", "text-white");
-    else if (type === "success")
-      messageBox.classList.add("bg-green-500", "text-white");
-    else messageBox.classList.add("bg-blue-500", "text-white");
+    messageBox.className = `${toastBaseClasses} ${toastTypeClasses[type]}`;
     messageBox.style.display = "block";
     setTimeout(() => {
       if (messageBox) messageBox.style.display = "none";

@@ -1,5 +1,11 @@
-export const LoadingSpinner: React.FC = () => (
-  <div className='flex justify-center items-center h-20'>
-    <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
+import { Loader2 } from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+export const LoadingSpinner: React.FC<{ className?: string }> = ({
+  className,
+}) => (
+  <div className={cn("flex h-20 items-center justify-center", className)}>
+    <Loader2 className='size-6 animate-spin text-muted-foreground' />
   </div>
 );

@@ -1,6 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input, Select } from "@/components/ui/input";
 
 // Define the props the component will accept
 interface PaginationControlsProps {
@@ -21,8 +24,16 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
   onPageChange,
   itemsPerPage,
   onItemsPerPageChange,
-  prevButtonContent = <> &larr; Previous</>,
-  nextButtonContent = <>Next &rarr; </>,
+  prevButtonContent = (
+    <>
+      <ChevronLeft /> Previous
+    </>
+  ),
+  nextButtonContent = (
+    <>
+      Next <ChevronRight />
+    </>
+  ),
   noun = "Page",
   showItemsPerPage = true, // <-- ADDED: Default to true for backward compatibility
 }) => {
@@ -60,61 +71,61 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
   }
 
   return (
-    <div className='mt-8 flex flex-col sm:flex-row justify-between items-center gap-4 pt-6'>
-      {/* Previous Button */}
-      <button
-        onClick={handlePreviousPage}
-        disabled={currentPage === 1}
-        className='w-full sm:w-auto bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2'
-      >
-        {prevButtonContent}
-      </button>
-
-      {/* Page Info and Jumper */}
-      <div className='flex items-center justify-center gap-2 text-lg font-medium text-foreground'>
-        <span>{noun}</span>
-        <input
-          type='text'
-          value={pageNumberInput}
-          onChange={(e) => setPageNumberInput(e.target.value)}
-          onKeyDown={handlePageJump}
-          className='w-14 text-center p-2 border border-border-base rounded shadow-sm bg-background-surface text-text-base focus:outline-none focus:ring-2 focus:ring-primary'
-          aria-label={`Current ${noun.toLowerCase()}, enter a number to jump to`}
-        />
-        <span className='text-text-muted'>of {totalPages}</span>
-      </div>
-
-      {/* Next Button */}
-      <button
-        onClick={handleNextPage}
-        disabled={currentPage === totalPages}
-        className='w-full sm:w-auto bg-accent hover:bg-accent/80 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2'
-      >
-        {nextButtonContent}
-      </button>
-
-      {/* MODIFIED: Items per page selector is now conditional */}
-      {showItemsPerPage && (
-        <div className='flex items-center gap-2'>
-          <label
-            htmlFor='itemsPerPage'
-            className='text-text-base text-sm font-medium'
-          >
-            Items/Page:
-          </label>
-          <select
+    <div className='flex flex-col items-center justify-between gap-3 border-t border-border px-5 py-3 sm:flex-row'>
+      {/* Items per page selector is optional */}
+      {showItemsPerPage ? (
+        <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+          <label htmlFor='itemsPerPage'>Rows per page</label>
+          <Select
             id='itemsPerPage'
             value={itemsPerPage}
             onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-            className='border border-border-base rounded py-1 px-2 bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary'
+            className='h-8 w-auto'
           >
             <option value={5}>5</option>
             <option value={10}>10</option>
             <option value={20}>20</option>
             <option value={50}>50</option>
-          </select>
+          </Select>
         </div>
+      ) : (
+        <div className='hidden sm:block' />
       )}
+
+      <div className='flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end'>
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={handlePreviousPage}
+          disabled={currentPage === 1}
+        >
+          {prevButtonContent}
+        </Button>
+
+        {/* Page Info and Jumper */}
+        <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+          <span>{noun}</span>
+          <Input
+            type='text'
+            inputMode='numeric'
+            value={pageNumberInput}
+            onChange={(e) => setPageNumberInput(e.target.value)}
+            onKeyDown={handlePageJump}
+            className='h-8 w-12 px-1 text-center'
+            aria-label={`Current ${noun.toLowerCase()}, enter a number to jump to`}
+          />
+          <span>of {totalPages}</span>
+        </div>
+
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={handleNextPage}
+          disabled={currentPage === totalPages}
+        >
+          {nextButtonContent}
+        </Button>
+      </div>
     </div>
   );
 };

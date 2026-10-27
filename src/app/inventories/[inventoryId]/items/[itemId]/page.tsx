@@ -9,6 +9,26 @@ import {
   useUpdateInventoryItem,
 } from "@/hooks/useInventoryItems";
 import { PaginationControls } from "@/components/PaginationControls";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PageContainer, PageHeader } from "@/components/ui/page-header";
+import { cn } from "@/lib/utils";
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Equal,
+  Minus,
+  Plus,
+} from "lucide-react";
 
 type InventoryItemSortColumn =
   | "name"
@@ -229,11 +249,7 @@ export default function InventoryItemDetailPage() {
   };
 
   if (isInventoryItemLoading || areAllItemsLoading) {
-    return (
-      <div className='flex justify-center items-center h-screen bg-background-base'>
-        <div className='animate-spin rounded-full h-10 w-10 border-b-2 border-primary'></div>
-      </div>
-    );
+    return <LoadingSpinner className='min-h-[60vh]' />;
   }
   if (isInventoryItemError || areAllItemsError || !inventoryItem) {
     const errorMsg =
@@ -241,9 +257,20 @@ export default function InventoryItemDetailPage() {
       allItemsError?.message ||
       "Inventory item not found.";
     return (
-      <div className='text-error text-center mt-8 bg-background-base p-4 rounded-lg'>
-        Error: {errorMsg}
-      </div>
+      <PageContainer className='max-w-md'>
+        <Card>
+          <CardContent className='text-center'>
+            <p className='mb-4 text-sm text-destructive'>{errorMsg}</p>
+            <Button
+              variant='outline'
+              onClick={() => router.push(`/inventories/${inventoryId}`)}
+            >
+              <ArrowLeft />
+              Back to inventory
+            </Button>
+          </CardContent>
+        </Card>
+      </PageContainer>
     );
   }
 
@@ -256,107 +283,149 @@ export default function InventoryItemDetailPage() {
   const isUpdating = updateInventoryItemMutation.isPending;
 
   return (
-    <div className='container mx-auto p-4 max-w-2xl bg-background-base mt-4 rounded-lg'>
-      <header className='flex flex-col sm:flex-row justify-between items-center mb-6 gap-4'>
-        <h1 className='text-2xl sm:text-3xl font-bold text-foreground text-center sm:text-left'>
-          Viewing Item: {item?.name ?? "Loading..."}
-        </h1>
-        <button
-          onClick={() => router.push(`/inventories/${inventoryId}`)}
-          className='bg-secondary hover:bg-secondary/80 text-text-inverse font-bold py-2 px-4 rounded shadow-md w-full sm:w-auto'
-        >
-          Back to Inventory
-        </button>
-      </header>
-      <main className='bg-background-surface p-4 sm:p-6 rounded-lg shadow-md border border-border-base'>
-        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 text-lg mb-6'>
-          <p>
-            <span className='font-semibold'>Item Name:</span>{" "}
-            {item?.name ?? "N/A"}
+    <PageContainer className='max-w-2xl'>
+      <Button
+        variant='ghost'
+        size='sm'
+        className='-ml-3 mb-3 text-muted-foreground'
+        onClick={() => router.push(`/inventories/${inventoryId}`)}
+      >
+        <ArrowLeft />
+        Back to inventory
+      </Button>
+
+      <PageHeader
+        title={item?.name ?? "Loading..."}
+        description={
+          <span className='flex flex-wrap items-center gap-x-3 gap-y-1'>
+            <Badge>{item?.unit_type ?? "N/A"}</Badge>
+            {totalItems > 0 && currentIndex >= 0 && (
+              <span>
+                Item {currentIndex + 1} of {totalItems} to enter
+              </span>
+            )}
+          </span>
+        }
+      />
+
+      <Card className='mb-6'>
+        <CardContent className='flex flex-col items-center py-8'>
+          <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+            Current count
           </p>
-          <p>
-            <span className='font-semibold'>Unit Type:</span>{" "}
-            <span className='capitalize'>{item?.unit_type ?? "N/A"}</span>
+          <p className='mt-2 text-5xl font-semibold tabular-nums text-foreground'>
+            {currentCount}
           </p>
-          <p>
-            <span className='font-semibold'>UPC Number:</span>{" "}
-            {item?.upc_number || "N/A"}
-          </p>
-          {item?.unit_type === "weight" && (
-            <p>
-              <span className='font-semibold'>Avg. Unit Weight:</span>{" "}
-              {item?.average_weight_per_unit?.toFixed(2) || "N/A"} lbs
+          {calculatedTotalWeight !== null && (
+            <p className='mt-2 text-sm text-muted-foreground'>
+              Total weight{" "}
+              <span className='font-medium tabular-nums text-foreground'>
+                {calculatedTotalWeight} lbs
+              </span>
             </p>
           )}
-          <p>
-            <span className='font-semibold'>Master Item ID:</span>{" "}
-            {inventoryItem.item_id}
-          </p>
-          <p>
-            <span className='font-semibold'>Inventory Item ID:</span>{" "}
-            {inventoryItem.id}
-          </p>
-        </div>
-        <div className='mt-6 pt-6'>
-          <h2 className='text-2xl font-semibold mb-4 text-foreground text-center'>
-            Current Count
-          </h2>
-          <div className='text-4xl font-extrabold text-primary text-center mb-6'>
-            {currentCount}
-          </div>
-          <div className='flex flex-col gap-4 items-center'>
-            <input
+
+          <div className='mt-8 w-full max-w-sm'>
+            <Input
               id='countInput'
               type='number'
+              inputMode='decimal'
               step={item?.unit_type === "quantity" ? "1" : "any"}
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder='Enter value'
-              className='p-3 border border-border-base rounded-lg shadow-sm text-center text-foreground bg-background w-full max-w-xs focus:outline-none focus:ring-2 focus:ring-primary'
+              placeholder='Enter a value'
+              aria-label='Count value'
+              className='h-12 text-center text-lg'
             />
-            <div className='flex flex-wrap justify-center gap-3 w-full max-w-xs'>
-              <button
-                onClick={() => handleOperation("add")}
-                disabled={isUpdating || inputValue === ""}
-                className='flex-1 min-w-[80px] bg-success hover:bg-success/80 text-text-inverse font-bold py-3 px-4 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200'
-              >
-                Add
-              </button>
-              <button
+            <div className='mt-3 grid grid-cols-3 gap-2'>
+              <Button
+                size='lg'
+                variant='outline'
                 onClick={() => handleOperation("subtract")}
                 disabled={isUpdating || inputValue === ""}
-                className='flex-1 min-w-[80px] bg-error hover:bg-error/80 text-text-inverse font-bold py-3 px-4 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200'
               >
+                <Minus />
                 Subtract
-              </button>
-              <button
+              </Button>
+              <Button
+                size='lg'
+                variant='outline'
                 onClick={() => handleOperation("replace")}
                 disabled={isUpdating || inputValue === ""}
-                className='flex-1 min-w-[80px] bg-primary hover:bg-primary/80 text-text-inverse font-bold py-3 px-4 rounded-lg shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200'
               >
-                Replace
-              </button>
+                <Equal />
+                Set
+              </Button>
+              <Button
+                size='lg'
+                onClick={() => handleOperation("add")}
+                disabled={isUpdating || inputValue === ""}
+              >
+                <Plus />
+                Add
+              </Button>
             </div>
           </div>
-          {calculatedTotalWeight !== null && (
-            <p className='mt-6 text-text-muted text-center text-lg'>
-              Calculated Total Weight:{" "}
-              <span className='font-semibold'>{calculatedTotalWeight}</span> lbs
-            </p>
-          )}
-        </div>
+        </CardContent>
         <PaginationControls
           currentPage={currentIndex + 1}
           totalPages={totalItems}
           onPageChange={(page) => navigateToItem(page - 1)}
           itemsPerPage={1}
           onItemsPerPageChange={() => {}}
-          prevButtonContent={<>&larr; Previous Item</>}
-          nextButtonContent={<>Next Item &rarr;</>}
+          prevButtonContent={
+            <>
+              <ChevronLeft /> Previous
+            </>
+          }
+          nextButtonContent={
+            <>
+              Next <ChevronRight />
+            </>
+          }
           noun='Item'
           showItemsPerPage={false}
         />
-      </main>
-    </div>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Item details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <dl className='grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2'>
+            {[
+              { label: "Name", value: item?.name ?? "N/A" },
+              { label: "Count by", value: item?.unit_type ?? "N/A" },
+              { label: "UPC", value: item?.upc_number || "—", mono: true },
+              ...(item?.unit_type === "weight"
+                ? [
+                    {
+                      label: "Avg. unit weight",
+                      value: `${
+                        item?.average_weight_per_unit?.toFixed(2) || "N/A"
+                      } lbs`,
+                    },
+                  ]
+                : []),
+              { label: "Type", value: item?.item_type || "—" },
+              { label: "Brand", value: item?.brand || "—" },
+            ].map((row) => (
+              <div key={row.label}>
+                <dt className='text-xs text-muted-foreground'>{row.label}</dt>
+                <dd
+                  className={cn(
+                    "mt-0.5 font-medium capitalize text-foreground",
+                    "mono" in row && row.mono && "font-mono normal-case"
+                  )}
+                >
+                  {row.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </CardContent>
+      </Card>
+    </PageContainer>
   );
 }

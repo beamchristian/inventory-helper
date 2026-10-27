@@ -10,10 +10,8 @@ const SignInPage = async () => {
   }
 
   return (
-    <div className='w-full flex mt-20 justify-center'>
-      <section className='flex flex-col w-[400px]'>
-        <LoginForm />
-      </section>
+    <div className='flex min-h-[calc(100vh-3.5rem)] items-center justify-center px-4 py-12'>
+      <LoginForm />
     </div>
   );
 };

@@ -16,7 +16,68 @@ import { useUpdateInventory } from "@/hooks/useInventories";
 import { PaginationControls } from "@/components/PaginationControls";
 import { useInventoryDetails } from "@/hooks/useInventoryDetails";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { handleCopyValue, showMessage } from "@/lib/utils";
+import { cn, handleCopyValue, showMessage } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/input";
+import { StatusBadge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { PageContainer, PageHeader } from "@/components/ui/page-header";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  CheckCircle2,
+  ChevronDown,
+  Copy,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
+
+// Sortable column header for the items table
+function SortableTh({
+  label,
+  column,
+  sortColumn,
+  sortDirection,
+  onSort,
+  className,
+}: {
+  label: string;
+  column: InventoryItemSortColumn;
+  sortColumn: InventoryItemSortColumn;
+  sortDirection: "asc" | "desc";
+  onSort: (column: InventoryItemSortColumn) => void;
+  className?: string;
+}) {
+  const isActive = sortColumn === column;
+  return (
+    <th className={cn("px-4 py-2.5 font-medium", className)}>
+      <button
+        onClick={() => onSort(column)}
+        className={cn(
+          "inline-flex items-center gap-1 transition-colors hover:text-foreground",
+          isActive && "text-foreground"
+        )}
+      >
+        {label}
+        {isActive &&
+          (sortDirection === "asc" ? (
+            <ArrowUp className='size-3' />
+          ) : (
+            <ArrowDown className='size-3' />
+          ))}
+      </button>
+    </th>
+  );
+}
 
 export default function InventoryDetailPage() {
   const router = useRouter();
@@ -347,107 +408,130 @@ export default function InventoryDetailPage() {
   };
 
   if (isInventoryLoading || isAllItemsLoading || isCurrentItemsLoading) {
+    return <LoadingSpinner className='min-h-[60vh]' />;
+  }
+
+  if (isInventoryError || isAllItemsError || isCurrentItemsError || !inventory) {
+    const errorMessage = !inventory
+      ? "Inventory not found."
+      : inventoryError?.message ||
+        allItemsError?.message ||
+        currentItemsError?.message;
     return (
-      <div className='min-h-screen flex items-center justify-center bg-background-base'>
-        <LoadingSpinner />
-      </div>
+      <PageContainer className='max-w-md'>
+        <Card>
+          <CardContent className='text-center'>
+            <p className='mb-4 text-sm text-destructive'>{errorMessage}</p>
+            <Button variant='outline' onClick={() => router.push("/")}>
+              <ArrowLeft />
+              Back to inventories
+            </Button>
+          </CardContent>
+        </Card>
+      </PageContainer>
     );
   }
 
-  if (isInventoryError || isAllItemsError || isCurrentItemsError) {
-    const errorMessage =
-      inventoryError?.message ||
-      allItemsError?.message ||
-      currentItemsError?.message;
-    return (
-      <div className='min-h-screen flex items-center justify-center bg-background-base'>
-        <div className='text-center p-6 bg-background-surface rounded-lg shadow-md'>
-          <p className='text-error text-lg mb-4'>Error: {errorMessage}</p>
-          <button
-            onClick={() => router.push("/")}
-            className='mt-4 bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded'
-          >
-            Go back to Inventories
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!inventory) {
-    return (
-      <div className='min-h-screen flex items-center justify-center bg-background-base'>
-        <div className='text-center p-6 bg-background-surface rounded-lg shadow-md'>
-          <p className='text-text-muted text-lg mb-4'>Inventory not found.</p>
-          <button
-            onClick={() => router.push("/")}
-            className='mt-4 bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded'
-          >
-            Go back to Inventories
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const itemHref = (id: string) =>
+    `/inventories/${inventoryId}/items/${id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`;
+  const weightLabel = (invItem: CombinedInventoryItem) =>
+    `${(
+      (invItem.counted_units || 0) *
+      (invItem.item?.average_weight_per_unit || 0)
+    ).toFixed(2)} lbs`;
+  const totalItemCount = unenteredItems.length + enteredItems.length;
+  const isAddBusy =
+    addInventoryItemMutation.isPending || addAllInventoryItemsMutation.isPending;
+  const sortProps = { sortColumn, sortDirection, onSort: handleSort };
 
   return (
-    <div className='container mx-auto p-4 max-w-6xl min-h-screen bg-background-base'>
+    <PageContainer>
       <div
         id='messageBox'
-        className='fixed top-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50 hidden'
+        className='fixed bottom-4 right-4 z-50 hidden rounded-md border bg-card px-4 py-3 text-sm shadow-lg'
       ></div>
-      <header className='flex flex-col sm:flex-row justify-between items-start mb-8 gap-4'>
-        <div>
-          <h1 className='text-3xl font-bold text-text-base text-center sm:text-left'>
-            Inventory: {inventory.name}
-          </h1>
-          <p className='text-md text-text-muted mt-1 text-center sm:text-left'>
-            {unenteredItems.length}{" "}
-            {unenteredItems.length === 1 ? "item" : "items"} to enter
-          </p>
-        </div>
-        <div className='flex flex-col sm:flex-row gap-2'>
-          <button
-            onClick={() => router.push("/")}
-            className='bg-secondary hover:bg-secondary/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md w-full sm:w-auto'
-          >
-            Back to All Inventories
-          </button>
-        </div>
-      </header>
 
-      <main className='bg-background-surface p-4 sm:p-6 rounded-lg shadow-md'>
-        <p className='text-lg text-text-base mb-2'>
-          Status:
-          <span className='capitalize font-medium'>{inventory.status}</span>
-        </p>
-        <p className='text-sm text-text-muted'>
-          Created: {new Date(inventory.created_at).toLocaleDateString()} at{" "}
-          {new Date(inventory.created_at).toLocaleTimeString()}
-        </p>
-        <h2 className='text-2xl font-semibold mt-8 mb-4 text-text-base'>
-          Manage Items in This Inventory
-        </h2>
-        <div className='border border-border-base p-4 rounded bg-background-base mb-6 flex flex-wrap items-center gap-4'>
+      <Button
+        variant='ghost'
+        size='sm'
+        className='-ml-3 mb-3 text-muted-foreground'
+        onClick={() => router.push("/")}
+      >
+        <ArrowLeft />
+        Inventories
+      </Button>
+
+      <PageHeader
+        title={inventory.name}
+        description={
+          <span className='flex flex-wrap items-center gap-x-3 gap-y-1'>
+            <StatusBadge status={inventory.status} />
+            <span>
+              Created {new Date(inventory.created_at).toLocaleDateString()} at{" "}
+              {new Date(inventory.created_at).toLocaleTimeString([], {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </span>
+          </span>
+        }
+        actions={
+          inventory.status !== "completed" ? (
+            <Button
+              variant='success'
+              onClick={handleCompleteInventory}
+              disabled={updateInventoryMutation.isPending}
+            >
+              <CheckCircle2 />
+              {updateInventoryMutation.isPending
+                ? "Completing..."
+                : "Complete inventory"}
+            </Button>
+          ) : (
+            <span className='inline-flex items-center gap-1.5 text-sm font-medium text-success'>
+              <CheckCircle2 className='size-4' />
+              Inventory completed
+            </span>
+          )
+        }
+      />
+
+      {/* Summary stats */}
+      <div className='mb-6 grid grid-cols-3 gap-3'>
+        {[
+          { label: "Total items", value: totalItemCount },
+          { label: "To enter", value: unenteredItems.length },
+          { label: "Entered", value: enteredItems.length },
+        ].map((stat) => (
+          <Card key={stat.label} className='px-4 py-3'>
+            <p className='text-xs font-medium text-muted-foreground'>
+              {stat.label}
+            </p>
+            <p className='mt-1 text-2xl font-semibold tabular-nums text-foreground'>
+              {stat.value}
+            </p>
+          </Card>
+        ))}
+      </div>
+
+      {/* Add items */}
+      <Card className='mb-6'>
+        <CardContent className='flex flex-col gap-3 sm:flex-row sm:items-center'>
           <label
             htmlFor='selectItem'
-            className='text-lg font-medium text-text-base'
+            className='shrink-0 text-sm font-medium text-foreground'
           >
-            Add an existing item:
+            Add item
           </label>
-          <select
+          <Select
             id='selectItem'
             value={selectedItemIdToAdd}
             onChange={(e) => setSelectedItemIdToAdd(e.target.value)}
-            className='flex-grow min-w-[150px] p-2 border border-border-base rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary bg-background-surface text-text-base'
-            disabled={
-              addInventoryItemMutation.isPending ||
-              availableItemsToAdd.length === 0 ||
-              addAllInventoryItemsMutation.isPending
-            }
+            className='sm:flex-1'
+            disabled={isAddBusy || availableItemsToAdd.length === 0}
           >
             {availableItemsToAdd.length === 0 ? (
-              <option value=''>No more items to add</option>
+              <option value=''>All items have been added</option>
             ) : (
               availableItemsToAdd.map((item: Item) => (
                 <option key={item.id} value={item.id}>
@@ -455,373 +539,323 @@ export default function InventoryDetailPage() {
                 </option>
               ))
             )}
-          </select>
-          <button
-            onClick={handleAddItemToInventory}
-            disabled={
-              addInventoryItemMutation.isPending ||
-              availableItemsToAdd.length === 0 ||
-              !selectedItemIdToAdd ||
-              addAllInventoryItemsMutation.isPending
-            }
-            className='bg-primary hover:bg-primary/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
-          >
-            {addInventoryItemMutation.isPending ? "Adding..." : "Add Item"}
-          </button>
-          <button
-            onClick={handleAddAllRemainingItemsToInventory}
-            disabled={
-              addAllInventoryItemsMutation.isPending ||
-              availableItemsToAdd.length === 0 ||
-              addInventoryItemMutation.isPending
-            }
-            className='bg-success hover:bg-success/90 text-text-inverse font-bold py-2 px-4 rounded shadow-md disabled:opacity-50 disabled:cursor-not-allowed'
-          >
-            {addAllInventoryItemsMutation.isPending
-              ? "Adding All..."
-              : "Add All Remaining Items"}
-          </button>
-        </div>
+          </Select>
+          <div className='flex gap-2'>
+            <Button
+              onClick={handleAddItemToInventory}
+              disabled={
+                isAddBusy ||
+                availableItemsToAdd.length === 0 ||
+                !selectedItemIdToAdd
+              }
+              className='flex-1 sm:flex-none'
+            >
+              <Plus />
+              {addInventoryItemMutation.isPending ? "Adding..." : "Add"}
+            </Button>
+            <Button
+              variant='outline'
+              onClick={handleAddAllRemainingItemsToInventory}
+              disabled={isAddBusy || availableItemsToAdd.length === 0}
+              className='flex-1 sm:flex-none'
+            >
+              {addAllInventoryItemsMutation.isPending
+                ? "Adding all..."
+                : `Add all remaining (${availableItemsToAdd.length})`}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-        <div>
-          {unenteredItems.length === 0 ? (
-            <p className='text-text-muted text-center py-8'>
-              This inventory has no items to be entered. Check the &quot;Entered
-              Items&quot; list below.
-            </p>
-          ) : (
-            <>
-              {/* Desktop Table */}
-              <div className='hidden md:block overflow-x-auto'>
-                <table className='min-w-full table-auto'>
-                  <thead className='bg-background-base text-left text-xs font-semibold text-text-muted uppercase tracking-wider'>
-                    <tr>
-                      <th className='py-3 px-2 w-[5%] text-center'>Done</th>
-                      <th
-                        className='py-3 px-4 w-[25%] cursor-pointer'
-                        onClick={() => handleSort("name")}
-                      >
-                        Name
-                        {sortColumn === "name" &&
-                          (sortDirection === "asc" ? "↑" : "↓")}
-                      </th>
-                      <th
-                        className='py-3 px-4 w-[15%] cursor-pointer'
-                        onClick={() => handleSort("upc_number")}
-                      >
-                        UPC
-                        {sortColumn === "upc_number" &&
-                          (sortDirection === "asc" ? "↑" : "↓")}
-                      </th>
-                      <th
-                        className='py-3 px-4 w-[10%] cursor-pointer'
-                        onClick={() => handleSort("brand")}
-                      >
-                        Brand
-                        {sortColumn === "brand" &&
-                          (sortDirection === "asc" ? "↑" : "↓")}
-                      </th>
-                      <th
-                        className='py-3 px-4 w-[10%] cursor-pointer'
-                        onClick={() => handleSort("item_type")}
-                      >
-                        Type
-                        {sortColumn === "item_type" &&
-                          (sortDirection === "asc" ? "↑" : "↓")}
-                      </th>
-                      <th
-                        className='py-3 px-4 w-[10%] text-center cursor-pointer'
-                        onClick={() => handleSort("counted_units")}
-                      >
-                        Count
-                        {sortColumn === "counted_units" &&
-                          (sortDirection === "asc" ? "↑" : "↓")}
-                      </th>
-                      <th
-                        className='py-3 px-4 w-[15%] text-center cursor-pointer'
-                        onClick={() => handleSort("calculated_weight")}
-                      >
-                        Calculated Weight
-                        {sortColumn === "calculated_weight" &&
-                          (sortDirection === "asc" ? "↑" : "↓")}
-                      </th>
-                      <th className='py-3 px-4 w-[20%] text-center'>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className='divide-y divide-border-base'>
-                    {paginatedItems.map((invItem: CombinedInventoryItem) => (
-                      <tr key={invItem.id} className='hover:bg-background-base'>
-                        <td className='py-3 px-2 text-center'>
-                          <input
-                            type='checkbox'
-                            className='h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary'
-                            onChange={() =>
-                              handleToggleEntered(invItem.id, true)
-                            }
-                          />
-                        </td>
-                        <td className='py-3 px-4 text-foreground'>
-                          <button
-                            onClick={() =>
-                              router.push(
-                                `/inventories/${inventoryId}/items/${invItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
-                              )
-                            }
-                          >
-                            {invItem.item?.name || "N/A"}
-                          </button>
-                        </td>
-                        <td className='py-3 px-4 text-text-muted'>
-                          {invItem.item?.upc_number || "N/A"}
-                        </td>
-                        <td className='py-3 px-4 text-text-muted'>
-                          {invItem.item?.brand || "N/A"}
-                        </td>
-                        <td className='py-3 px-4 text-text-muted capitalize'>
-                          {invItem.item?.item_type || "N/A"}
-                        </td>
-                        <td className='py-3 px-4 text-text-muted text-center'>
-                          {invItem.counted_units}
-                        </td>
-                        <td className='py-3 px-4 text-text-muted text-center'>
-                          {invItem.item?.unit_type === "weight"
-                            ? `${(
-                                (invItem.counted_units || 0) *
-                                (invItem.item?.average_weight_per_unit || 0)
-                              ).toFixed(2)} lbs`
-                            : "N/A"}
-                        </td>
-                        <td className='py-3 px-4 text-center'>
-                          <div className='flex justify-center items-center gap-2'>
-                            {invItem.counted_units > 0 && (
-                              <button
-                                onClick={() => handleCopyValue(invItem)}
-                                className='bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded'
-                                title='Copy Value'
-                              >
-                                Copy
-                              </button>
-                            )}
-                            <button
-                              onClick={() =>
-                                router.push(
-                                  `/inventories/${inventoryId}/items/${invItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
-                                )
-                              }
-                              className='bg-primary hover:bg-primary/90 text-text-inverse text-xs py-1 px-2 rounded'
-                            >
-                              View
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleUpdateCountedUnits(
-                                  invItem.id,
-                                  invItem.counted_units,
-                                  invItem.item?.unit_type || "units"
-                                )
-                              }
-                              className='bg-accent hover:bg-accent/80 text-text-inverse text-xs py-1 px-2 rounded'
-                            >
-                              Update
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleDeleteInventoryItem(
-                                  invItem.id,
-                                  invItem.item?.name || "Unknown"
-                                )
-                              }
-                              className='bg-error hover:bg-error/90 text-text-inverse text-xs py-1 px-2 rounded'
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      {/* Items to enter */}
+      <Card className='mb-6 overflow-hidden'>
+        <CardHeader>
+          <div>
+            <CardTitle>Items to enter</CardTitle>
+            <CardDescription>
+              Tick an item once its count has been entered.
+            </CardDescription>
+          </div>
+        </CardHeader>
 
-              {/* Mobile Card View */}
-              <div className='md:hidden space-y-4'>
-                {paginatedItems.map((invItem: CombinedInventoryItem) => (
-                  <div
-                    key={invItem.id}
-                    className='p-4 bg-background rounded-lg border border-border-base shadow-sm'
-                  >
-                    <div className='flex justify-between items-center mb-2'>
-                      <h3 className='font-bold text-lg text-foreground'>
+        {unenteredItems.length === 0 ? (
+          <p className='px-5 py-12 text-center text-sm text-muted-foreground'>
+            Nothing left to enter. Entered items are listed below.
+          </p>
+        ) : (
+          <>
+            {/* Desktop Table */}
+            <div className='hidden overflow-x-auto md:block'>
+              <table className='w-full text-sm'>
+                <thead className='border-b border-border bg-muted/50 text-left text-xs text-muted-foreground'>
+                  <tr>
+                    <th className='w-12 px-4 py-2.5 text-center font-medium'>
+                      <span className='sr-only'>Entered</span>
+                    </th>
+                    <SortableTh label='Name' column='name' {...sortProps} />
+                    <SortableTh label='UPC' column='upc_number' {...sortProps} />
+                    <SortableTh label='Brand' column='brand' {...sortProps} />
+                    <SortableTh label='Type' column='item_type' {...sortProps} />
+                    <SortableTh
+                      label='Count'
+                      column='counted_units'
+                      className='text-right'
+                      {...sortProps}
+                    />
+                    <SortableTh
+                      label='Weight'
+                      column='calculated_weight'
+                      className='text-right'
+                      {...sortProps}
+                    />
+                    <th className='px-4 py-2.5 text-right font-medium'>
+                      <span className='sr-only'>Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className='divide-y divide-border'>
+                  {paginatedItems.map((invItem: CombinedInventoryItem) => (
+                    <tr
+                      key={invItem.id}
+                      className='transition-colors hover:bg-muted/40'
+                    >
+                      <td className='px-4 py-2.5 text-center'>
+                        <input
+                          type='checkbox'
+                          className='size-4 cursor-pointer rounded accent-primary'
+                          onChange={() => handleToggleEntered(invItem.id, true)}
+                          aria-label={`Mark ${invItem.item?.name} as entered`}
+                        />
+                      </td>
+                      <td className='px-4 py-2.5'>
                         <button
-                          onClick={() =>
-                            router.push(
-                              `/inventories/${inventoryId}/items/${invItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
-                            )
-                          }
+                          onClick={() => router.push(itemHref(invItem.id))}
+                          className='text-left font-medium text-foreground hover:text-primary hover:underline'
                         >
                           {invItem.item?.name || "N/A"}
                         </button>
-                      </h3>
-                      <input
-                        type='checkbox'
-                        className='h-6 w-6 rounded border-gray-300 text-primary focus:ring-primary'
-                        onChange={() => handleToggleEntered(invItem.id, true)}
-                      />
-                    </div>
-                    <div className='space-y-2 text-sm'>
-                      <div className='flex justify-between'>
-                        <span className='font-semibold text-text-muted'>
-                          UPC:
-                        </span>
-                        <span>{invItem.item?.upc_number || "N/A"}</span>
-                      </div>
-                      <div className='flex justify-between'>
-                        <span className='font-semibold text-text-muted'>
-                          Type:
-                        </span>
-                        <span className='capitalize'>
-                          {invItem.item?.item_type || "N/A"}
-                        </span>
-                      </div>
-                      <div className='flex justify-between'>
-                        <span className='font-semibold text-text-muted'>
-                          Count:
-                        </span>
-                        <span>{invItem.counted_units}</span>
-                      </div>
-                      {invItem.item?.unit_type === "weight" && (
-                        <div className='flex justify-between'>
-                          <span className='font-semibold text-text-muted'>
-                            Calc. Weight:
-                          </span>
-                          <span>{`${(
-                            (invItem.counted_units || 0) *
-                            (invItem.item?.average_weight_per_unit || 0)
-                          ).toFixed(2)} lbs`}</span>
+                      </td>
+                      <td className='px-4 py-2.5 font-mono text-xs text-muted-foreground'>
+                        {invItem.item?.upc_number || "—"}
+                      </td>
+                      <td className='px-4 py-2.5 text-muted-foreground'>
+                        {invItem.item?.brand || "—"}
+                      </td>
+                      <td className='px-4 py-2.5 capitalize text-muted-foreground'>
+                        {invItem.item?.item_type || "—"}
+                      </td>
+                      <td className='px-4 py-2.5 text-right font-medium tabular-nums text-foreground'>
+                        {invItem.counted_units}
+                      </td>
+                      <td className='px-4 py-2.5 text-right tabular-nums text-muted-foreground'>
+                        {invItem.item?.unit_type === "weight"
+                          ? weightLabel(invItem)
+                          : "—"}
+                      </td>
+                      <td className='px-4 py-2.5'>
+                        <div className='flex items-center justify-end gap-1'>
+                          {invItem.counted_units > 0 && (
+                            <Button
+                              variant='ghost'
+                              size='icon-sm'
+                              onClick={() => handleCopyValue(invItem)}
+                              title='Copy value'
+                              aria-label='Copy value'
+                            >
+                              <Copy />
+                            </Button>
+                          )}
+                          <Button
+                            variant='ghost'
+                            size='icon-sm'
+                            onClick={() =>
+                              handleUpdateCountedUnits(
+                                invItem.id,
+                                invItem.counted_units,
+                                invItem.item?.unit_type || "units"
+                              )
+                            }
+                            title='Quick update count'
+                            aria-label='Quick update count'
+                          >
+                            <Pencil />
+                          </Button>
+                          <Button
+                            variant='ghost-destructive'
+                            size='icon-sm'
+                            onClick={() =>
+                              handleDeleteInventoryItem(
+                                invItem.id,
+                                invItem.item?.name || "Unknown"
+                              )
+                            }
+                            title='Remove from inventory'
+                            aria-label='Remove from inventory'
+                          >
+                            <Trash2 />
+                          </Button>
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            className='ml-1'
+                            onClick={() => router.push(itemHref(invItem.id))}
+                          >
+                            Count
+                          </Button>
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile list */}
+            <ul className='divide-y divide-border md:hidden'>
+              {paginatedItems.map((invItem: CombinedInventoryItem) => (
+                <li key={invItem.id} className='px-4 py-3'>
+                  <div className='flex items-start gap-3'>
+                    <input
+                      type='checkbox'
+                      className='mt-0.5 size-5 shrink-0 cursor-pointer rounded accent-primary'
+                      onChange={() => handleToggleEntered(invItem.id, true)}
+                      aria-label={`Mark ${invItem.item?.name} as entered`}
+                    />
+                    <button
+                      onClick={() => router.push(itemHref(invItem.id))}
+                      className='min-w-0 flex-1 text-left'
+                    >
+                      <p className='truncate font-medium text-foreground'>
+                        {invItem.item?.name || "N/A"}
+                      </p>
+                      <p className='mt-0.5 truncate text-xs capitalize text-muted-foreground'>
+                        {[invItem.item?.item_type, invItem.item?.brand]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </p>
+                    </button>
+                    <div className='shrink-0 text-right'>
+                      <p className='font-semibold tabular-nums text-foreground'>
+                        {invItem.counted_units}
+                      </p>
+                      {invItem.item?.unit_type === "weight" && (
+                        <p className='text-xs tabular-nums text-muted-foreground'>
+                          {weightLabel(invItem)}
+                        </p>
                       )}
-                    </div>
-                    <div className='flex justify-end gap-2 mt-4 pt-3 border-t border-border-base'>
-                      {invItem.counted_units > 0 && (
-                        <button
-                          onClick={() => handleCopyValue(invItem)}
-                          className='bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 px-2 rounded'
-                          title='Copy Value'
-                        >
-                          Copy
-                        </button>
-                      )}
-                      <button
-                        onClick={() =>
-                          router.push(
-                            `/inventories/${inventoryId}/items/${invItem.id}?sortColumn=${sortColumn}&sortDirection=${sortDirection}`
-                          )
-                        }
-                        className='bg-primary hover:bg-primary/90 text-text-inverse text-xs py-1 px-2 rounded'
-                      >
-                        View/Edit
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleUpdateCountedUnits(
-                            invItem.id,
-                            invItem.counted_units,
-                            invItem.item?.unit_type || "units"
-                          )
-                        }
-                        className='bg-accent hover:bg-accent/80 text-text-inverse text-xs py-1 px-2 rounded'
-                      >
-                        Update
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleDeleteInventoryItem(
-                            invItem.id,
-                            invItem.item?.name || "Unknown"
-                          )
-                        }
-                        className='bg-error hover:bg-error/90 text-text-inverse text-xs py-1 px-2 rounded'
-                      >
-                        Remove
-                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-
-              <div className='text-center text-sm text-text-muted my-4'>
-                Displaying {paginatedItems.length} of {unenteredItems.length}{" "}
-                remaining items.
-              </div>
-              <PaginationControls
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                itemsPerPage={itemsPerPage}
-                onItemsPerPageChange={handleItemsPerPageChange}
-              />
-            </>
-          )}
-        </div>
-
-        <div className='mt-12'>
-          <button
-            onClick={() => setShowEntered(!showEntered)}
-            className='text-lg font-semibold text-primary hover:underline w-full text-left p-2 rounded flex justify-between items-center'
-          >
-            <span>✅ Entered Items ({enteredItems.length})</span>
-            <span>{showEntered ? "Hide" : "Show"}</span>
-          </button>
-          {showEntered && (
-            <div className='mt-4 border-t border-border-base pt-4'>
-              {enteredItems.length === 0 ? (
-                <p className='text-text-muted text-center'>
-                  No items have been marked as entered yet.
-                </p>
-              ) : (
-                <ul className='space-y-2'>
-                  {enteredItems.map((item: CombinedInventoryItem) => (
-                    <li
-                      key={item.id}
-                      className='flex items-center justify-between p-2 bg-background-base rounded'
-                    >
-                      <span className='text-text-base'>
-                        {item.item?.name || "N/A"}
-                      </span>
-                      <button
-                        onClick={() => handleToggleEntered(item.id, false)}
-                        className='text-sm text-accent hover:underline'
-                        title='Move back to main list'
+                  <div className='mt-2 flex justify-end gap-1 pl-8'>
+                    {invItem.counted_units > 0 && (
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        onClick={() => handleCopyValue(invItem)}
                       >
-                        Undo
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </div>
+                        <Copy />
+                        Copy
+                      </Button>
+                    )}
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={() =>
+                        handleUpdateCountedUnits(
+                          invItem.id,
+                          invItem.counted_units,
+                          invItem.item?.unit_type || "units"
+                        )
+                      }
+                    >
+                      <Pencil />
+                      Update
+                    </Button>
+                    <Button
+                      variant='ghost-destructive'
+                      size='icon-sm'
+                      onClick={() =>
+                        handleDeleteInventoryItem(
+                          invItem.id,
+                          invItem.item?.name || "Unknown"
+                        )
+                      }
+                      aria-label='Remove from inventory'
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
 
-        {inventory.status !== "completed" && (
-          <div className='mt-8 text-right'>
-            <button
-              onClick={handleCompleteInventory}
-              disabled={updateInventoryMutation.isPending}
-              className='bg-success hover:bg-success/90 text-text-inverse font-bold py-2 px-6 rounded shadow-md'
-            >
-              {updateInventoryMutation.isPending
-                ? "Completing..."
-                : "Complete Inventory"}
-            </button>
+            <p className='border-t border-border px-5 py-2.5 text-xs text-muted-foreground'>
+              Showing {paginatedItems.length} of {unenteredItems.length}{" "}
+              remaining {unenteredItems.length === 1 ? "item" : "items"}
+            </p>
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              itemsPerPage={itemsPerPage}
+              onItemsPerPageChange={handleItemsPerPageChange}
+            />
+          </>
+        )}
+      </Card>
+
+      {/* Entered items */}
+      <Card className='overflow-hidden'>
+        <button
+          onClick={() => setShowEntered(!showEntered)}
+          className='flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-muted/40'
+          aria-expanded={showEntered}
+        >
+          <span className='flex items-center gap-2 text-base font-semibold text-foreground'>
+            <CheckCircle2 className='size-4 text-success' />
+            Entered items
+            <span className='rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'>
+              {enteredItems.length}
+            </span>
+          </span>
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform",
+              showEntered && "rotate-180"
+            )}
+          />
+        </button>
+        {showEntered && (
+          <div className='border-t border-border'>
+            {enteredItems.length === 0 ? (
+              <p className='px-5 py-8 text-center text-sm text-muted-foreground'>
+                No items have been marked as entered yet.
+              </p>
+            ) : (
+              <ul className='divide-y divide-border'>
+                {enteredItems.map((item: CombinedInventoryItem) => (
+                  <li
+                    key={item.id}
+                    className='flex items-center justify-between gap-3 px-5 py-2.5'
+                  >
+                    <span className='truncate text-sm text-muted-foreground line-through decoration-muted-foreground/40'>
+                      {item.item?.name || "N/A"}
+                    </span>
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      onClick={() => handleToggleEntered(item.id, false)}
+                      title='Move back to main list'
+                    >
+                      <RotateCcw />
+                      Undo
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
-        {inventory.status === "completed" && (
-          <div className='mt-8 text-right text-lg text-success font-semibold'>
-            This inventory is completed.
-          </div>
-        )}
-      </main>
-    </div>
+      </Card>
+    </PageContainer>
   );
 }
