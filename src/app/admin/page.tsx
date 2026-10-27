@@ -102,7 +102,11 @@ const AdminPage = () => {
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (confirm("Are you sure you want to permanently delete this user?")) {
+    if (
+      confirm(
+        "Permanently delete this user? Their items and inventories will be deleted too. This cannot be undone."
+      )
+    ) {
       deleteUserMutation.mutate(userId);
     }
   };

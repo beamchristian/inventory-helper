@@ -18,7 +18,6 @@ export const {
   ...authConfig,
   adapter: PrismaAdapter(db),
   providers: [
-    ...authConfig.providers,
     Credentials({
       authorize: async (credentials) => {
         if (!credentials?.email || !credentials.password) return null;

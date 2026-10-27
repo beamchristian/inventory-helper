@@ -1,10 +1,13 @@
 import type { NextAuthConfig } from "next-auth";
-import Github from "next-auth/providers/github";
 import type { Role } from "@prisma/client";
 
 // Edge-safe config: this file is loaded by the middleware, which runs in the
 // Edge Runtime. Keep Node-only code (Prisma, bcryptjs) out of it — the
 // Credentials provider and the Prisma adapter are added in src/lib/auth.ts.
+//
+// Email + password is the only sign-in method. Accounts are created by an
+// admin only, so don't add OAuth providers here: with the Prisma adapter they
+// create a new user automatically on first sign-in.
 export default {
   pages: {
     signIn: "/sign-in",
@@ -42,10 +45,5 @@ export default {
       return session;
     },
   },
-  providers: [
-    Github({
-      clientId: process.env.AUTH_GITHUB_ID,
-      clientSecret: process.env.AUTH_GITHUB_SECRET,
-    }),
-  ],
+  providers: [],
 } satisfies NextAuthConfig;

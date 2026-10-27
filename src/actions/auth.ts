@@ -9,12 +9,6 @@ export interface ActionState {
   success?: boolean;
 }
 
-// These actions can remain as they are
-export const login = async (provider: string) => {
-  await signIn(provider, { redirectTo: "/" });
-  revalidatePath("/");
-};
-
 export const logout = async () => {
   await signOut({ redirectTo: "/" });
   revalidatePath("/");
@@ -24,7 +18,7 @@ export const logout = async () => {
  * Logs in a user with credentials after validating their CAPTCHA token.
  */
 export const loginwithCreds = async (
-  formData: FormData
+  formData: FormData,
 ): Promise<ActionState> => {
   // NEW: Extract the captcha token from the form data
   const captchaToken = formData.get("captchaToken") as string;

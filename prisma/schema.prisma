@@ -53,6 +53,7 @@ model User {
   // Optional for WebAuthn support
   Authenticator    Authenticator[]
   Inventory        Inventory[]
+  items            Item[]
   PushSubscription PushSubscription[]
 }
 
@@ -108,6 +109,9 @@ model Item {
   created_at              DateTime        @default(now())
   inventoryItems          InventoryItem[]
 
+  // Deleting a user deletes their items (and, through InventoryItem, their counts)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   @@unique([user_id, upc_number], name: "unique_user_item_upc")
 }
 
@@ -121,8 +125,8 @@ model Inventory {
   updated_at DateTime        @updatedAt
   items      InventoryItem[]
 
-  // Define the relation to the User model (which maps to auth.users)
-  User   User?   @relation(fields: [userId], references: [id])
+  // Deleting a user deletes their inventories (and their counted rows)
+  User   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String? // @db.Uuid
 }
 
