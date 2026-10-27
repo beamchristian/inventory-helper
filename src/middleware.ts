@@ -1,10 +1,14 @@
 // src/middleware.ts
 
-// The middleware itself is now imported from your main auth file
-export { auth as middleware } from "./lib/auth";
+import NextAuth from "next-auth";
+import authConfig from "./auth.config";
 
-// Optional: You can still use a matcher to specify which routes the middleware should run on.
-// This is often more performant than running it on every single request.
+// The middleware runs in the Edge Runtime, so it builds its own auth instance
+// from the edge-safe config only (no Prisma adapter, no bcryptjs). It just
+// reads the session JWT and runs the `authorized` callback.
+export const { auth: middleware } = NextAuth(authConfig);
+
+// Run on all paths except API routes, static assets and PWA files.
 export const config = {
   matcher: [
     /*
