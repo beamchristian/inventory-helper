@@ -5,6 +5,9 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/input";
 
+// Choices for the "Rows per page" selector
+const PAGE_SIZE_OPTIONS = [5, 10, 20, 50, 100, 250, 500];
+
 // Define the props the component will accept
 interface PaginationControlsProps {
   currentPage: number;
@@ -39,6 +42,11 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
 }) => {
   const [pageNumberInput, setPageNumberInput] = useState(String(currentPage));
 
+  // Include the page's own default (e.g. 6) so the selector always matches it
+  const pageSizeOptions = PAGE_SIZE_OPTIONS.includes(itemsPerPage)
+    ? PAGE_SIZE_OPTIONS
+    : [...PAGE_SIZE_OPTIONS, itemsPerPage].sort((a, b) => a - b);
+
   useEffect(() => {
     setPageNumberInput(String(currentPage));
   }, [currentPage]);
@@ -66,7 +74,10 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
     }
   };
 
-  if (totalPages <= 1) {
+  // With a single page there is nothing to page through, but the rows-per-page
+  // selector stays visible so a large page size can be changed back.
+  const hasMultiplePages = totalPages > 1;
+  if (!hasMultiplePages && !showItemsPerPage) {
     return null;
   }
 
@@ -82,50 +93,53 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
             onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
             className='h-8 w-auto'
           >
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
+            {pageSizeOptions.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
           </Select>
         </div>
       ) : (
         <div className='hidden sm:block' />
       )}
 
-      <div className='flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end'>
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={handlePreviousPage}
-          disabled={currentPage === 1}
-        >
-          {prevButtonContent}
-        </Button>
+      {hasMultiplePages && (
+        <div className='flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end'>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={handlePreviousPage}
+            disabled={currentPage === 1}
+          >
+            {prevButtonContent}
+          </Button>
 
-        {/* Page Info and Jumper */}
-        <div className='flex items-center gap-2 text-sm text-muted-foreground'>
-          <span>{noun}</span>
-          <Input
-            type='text'
-            inputMode='numeric'
-            value={pageNumberInput}
-            onChange={(e) => setPageNumberInput(e.target.value)}
-            onKeyDown={handlePageJump}
-            className='h-8 w-12 px-1 text-center'
-            aria-label={`Current ${noun.toLowerCase()}, enter a number to jump to`}
-          />
-          <span>of {totalPages}</span>
+          {/* Page Info and Jumper */}
+          <div className='flex items-center gap-2 text-sm text-muted-foreground'>
+            <span>{noun}</span>
+            <Input
+              type='text'
+              inputMode='numeric'
+              value={pageNumberInput}
+              onChange={(e) => setPageNumberInput(e.target.value)}
+              onKeyDown={handlePageJump}
+              className='h-8 w-12 px-1 text-center'
+              aria-label={`Current ${noun.toLowerCase()}, enter a number to jump to`}
+            />
+            <span>of {totalPages}</span>
+          </div>
+
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={handleNextPage}
+            disabled={currentPage === totalPages}
+          >
+            {nextButtonContent}
+          </Button>
         </div>
-
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={handleNextPage}
-          disabled={currentPage === totalPages}
-        >
-          {nextButtonContent}
-        </Button>
-      </div>
+      )}
     </div>
   );
 };

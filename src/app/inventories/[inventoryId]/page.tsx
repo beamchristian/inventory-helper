@@ -28,6 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
+import { SearchInput } from "@/components/ui/search-input";
 import {
   ArrowDown,
   ArrowLeft,
@@ -91,7 +92,9 @@ export default function InventoryDetailPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedItemIdToAdd, setSelectedItemIdToAdd] = useState<string>("");
-  const [showEntered, setShowEntered] = useState(false);
+  // null = automatic: closed, but opened while a search matches entered items
+  const [showEntered, setShowEntered] = useState<boolean | null>(null);
+  const [searchInput, setSearchInput] = useState("");
 
   const {
     data: inventory,
@@ -185,14 +188,37 @@ export default function InventoryDetailPage() {
     return { unenteredItems: unentered, enteredItems: entered };
   }, [currentInventoryItems, sortColumn, sortDirection]);
 
-  const totalItems = unenteredItems.length;
+  // Search filters both lists; the totals above them stay unfiltered
+  const search = searchInput.trim().toLowerCase();
+  const { filteredUnentered, filteredEntered } = useMemo(() => {
+    if (!search) {
+      return { filteredUnentered: unenteredItems, filteredEntered: enteredItems };
+    }
+    const matches = (invItem: CombinedInventoryItem) =>
+      [
+        invItem.item?.name,
+        invItem.item?.upc_number,
+        invItem.item?.brand,
+        invItem.item?.item_type,
+      ].some((field) => field?.toLowerCase().includes(search));
+    return {
+      filteredUnentered: unenteredItems.filter(matches),
+      filteredEntered: enteredItems.filter(matches),
+    };
+  }, [search, unenteredItems, enteredItems]);
+
+  const totalItems = filteredUnentered.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return unenteredItems.slice(startIndex, endIndex);
-  }, [unenteredItems, currentPage, itemsPerPage]);
+    return filteredUnentered.slice(startIndex, endIndex);
+  }, [filteredUnentered, currentPage, itemsPerPage]);
+
+  // A click on the header always wins over the automatic behaviour
+  const isEnteredOpen =
+    showEntered ?? (!!search && filteredEntered.length > 0);
 
   const availableItemsToAdd = useMemo(() => {
     if (!allUserItems || !currentInventoryItems) return [];
@@ -576,12 +602,40 @@ export default function InventoryDetailPage() {
               Tick an item once its count has been entered.
             </CardDescription>
           </div>
+          <SearchInput
+            value={searchInput}
+            onValueChange={(value) => {
+              setSearchInput(value);
+              setCurrentPage(1); // results start on the first page
+            }}
+            placeholder='Search name, UPC, brand or type'
+            className='w-full sm:w-72'
+          />
         </CardHeader>
 
         {unenteredItems.length === 0 ? (
           <p className='px-5 py-12 text-center text-sm text-muted-foreground'>
             Nothing left to enter. Entered items are listed below.
           </p>
+        ) : filteredUnentered.length === 0 ? (
+          <div className='px-5 py-12 text-center text-sm text-muted-foreground'>
+            <p>
+              No items to enter match &quot;{searchInput.trim()}&quot;
+              {filteredEntered.length > 0 &&
+                ` — ${filteredEntered.length} entered ${
+                  filteredEntered.length === 1 ? "item matches" : "items match"
+                } below`}
+              .
+            </p>
+            <Button
+              variant='link'
+              size='sm'
+              className='mt-1'
+              onClick={() => setSearchInput("")}
+            >
+              Clear search
+            </Button>
+          </div>
         ) : (
           <>
             {/* Desktop Table */}
@@ -789,8 +843,10 @@ export default function InventoryDetailPage() {
             </ul>
 
             <p className='border-t border-border px-5 py-2.5 text-xs text-muted-foreground'>
-              Showing {paginatedItems.length} of {unenteredItems.length}{" "}
-              remaining {unenteredItems.length === 1 ? "item" : "items"}
+              Showing {paginatedItems.length} of {filteredUnentered.length}{" "}
+              {search ? "matching" : "remaining"}{" "}
+              {filteredUnentered.length === 1 ? "item" : "items"}
+              {search && ` (${unenteredItems.length} left to enter in total)`}
             </p>
             <PaginationControls
               currentPage={currentPage}
@@ -806,33 +862,39 @@ export default function InventoryDetailPage() {
       {/* Entered items */}
       <Card className='overflow-hidden'>
         <button
-          onClick={() => setShowEntered(!showEntered)}
+          onClick={() => setShowEntered(!isEnteredOpen)}
           className='flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-muted/40'
-          aria-expanded={showEntered}
+          aria-expanded={isEnteredOpen}
         >
           <span className='flex items-center gap-2 text-base font-semibold text-foreground'>
             <CheckCircle2 className='size-4 text-success' />
             Entered items
             <span className='rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'>
-              {enteredItems.length}
+              {search
+                ? `${filteredEntered.length} of ${enteredItems.length}`
+                : enteredItems.length}
             </span>
           </span>
           <ChevronDown
             className={cn(
               "size-4 text-muted-foreground transition-transform",
-              showEntered && "rotate-180"
+              isEnteredOpen && "rotate-180"
             )}
           />
         </button>
-        {showEntered && (
+        {isEnteredOpen && (
           <div className='border-t border-border'>
             {enteredItems.length === 0 ? (
               <p className='px-5 py-8 text-center text-sm text-muted-foreground'>
                 No items have been marked as entered yet.
               </p>
+            ) : filteredEntered.length === 0 ? (
+              <p className='px-5 py-8 text-center text-sm text-muted-foreground'>
+                No entered items match &quot;{searchInput.trim()}&quot;.
+              </p>
             ) : (
               <ul className='divide-y divide-border'>
-                {enteredItems.map((item: CombinedInventoryItem) => (
+                {filteredEntered.map((item: CombinedInventoryItem) => (
                   <li
                     key={item.id}
                     className='flex items-center justify-between gap-3 px-5 py-2.5'

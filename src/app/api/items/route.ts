@@ -1,4 +1,5 @@
 import { NextResponse, NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/db";
 import { auth } from "@/lib/auth";
 import {
@@ -38,14 +39,23 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10", 10);
     const skip = (page - 1) * limit;
 
+    // Optional search across name, UPC, brand and type (case-insensitive)
+    const query = searchParams.get("q")?.trim();
+    const where: Prisma.ItemWhereInput = { user_id: userId };
+    if (query) {
+      where.OR = (["name", "upc_number", "brand", "item_type"] as const).map(
+        (field) => ({ [field]: { contains: query, mode: "insensitive" } }),
+      );
+    }
+
     const [items, totalItems] = await db.$transaction([
       db.item.findMany({
-        where: { user_id: userId },
+        where,
         orderBy: { name: "asc" },
         skip,
         take: limit,
       }),
-      db.item.count({ where: { user_id: userId } }),
+      db.item.count({ where }),
     ]);
 
     return NextResponse.json({

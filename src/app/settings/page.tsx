@@ -23,7 +23,17 @@ import {
 } from "@/components/ui/card";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { cn, showMessage } from "@/lib/utils";
-import { ArrowDown, ArrowUp, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Package,
+  Pencil,
+  Plus,
+  SearchX,
+  Trash2,
+} from "lucide-react";
+import { SearchInput } from "@/components/ui/search-input";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 
 type SortColumn =
   | "name"
@@ -40,15 +50,19 @@ export default function SettingsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebouncedValue(searchInput.trim());
 
   const {
     data: itemsData,
     isLoading,
     isError,
     error,
+    isFetching,
   } = useItems({
     page: currentPage,
     limit: itemsPerPage,
+    search,
   });
 
   const itemsOnPage = useMemo(() => itemsData?.data || [], [itemsData]);
@@ -444,12 +458,45 @@ export default function SettingsPage() {
             {paginationInfo?.totalItems != null && (
               <CardDescription>
                 {paginationInfo.totalItems}{" "}
-                {paginationInfo.totalItems === 1 ? "item" : "items"}
+                {search
+                  ? paginationInfo.totalItems === 1
+                    ? "match"
+                    : "matches"
+                  : paginationInfo.totalItems === 1
+                  ? "item"
+                  : "items"}
+                {isFetching && " · searching…"}
               </CardDescription>
             )}
           </div>
+          <SearchInput
+            value={searchInput}
+            onValueChange={(value) => {
+              setSearchInput(value);
+              setCurrentPage(1); // results start on the first page
+            }}
+            placeholder='Search name, UPC, brand or type'
+            className='w-full sm:w-72'
+          />
         </CardHeader>
-        {!isLoading && !isError && itemsOnPage.length === 0 ? (
+        {!isLoading && !isError && itemsOnPage.length === 0 && search ? (
+          <div className='flex flex-col items-center px-5 py-14 text-center'>
+            <span className='mb-3 flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground'>
+              <SearchX className='size-5' />
+            </span>
+            <p className='text-sm font-medium text-foreground'>
+              No items match &quot;{search}&quot;
+            </p>
+            <Button
+              variant='link'
+              size='sm'
+              className='mt-1'
+              onClick={() => setSearchInput("")}
+            >
+              Clear search
+            </Button>
+          </div>
+        ) : !isLoading && !isError && itemsOnPage.length === 0 ? (
           <div className='flex flex-col items-center px-5 py-14 text-center'>
             <span className='mb-3 flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground'>
               <Package className='size-5' />

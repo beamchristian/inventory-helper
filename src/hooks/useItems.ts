@@ -1,5 +1,10 @@
 // src/hooks/useItems.ts
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { Item } from "@/types";
 
@@ -18,6 +23,7 @@ interface PaginatedItemsResponse {
 interface UseItemsProps {
   page?: number;
   limit?: number;
+  search?: string; // matches name, UPC, brand or type
 }
 
 // --- HELPER FUNCTION ---
@@ -37,17 +43,29 @@ const handleApiResponse = async (response: Response) => {
  * useItems Hook (FOR PAGINATED DATA)
  * Fetches a single page of master items. Used for the Settings page table.
  */
-export const useItems = ({ page = 1, limit = 10 }: UseItemsProps = {}) => {
+export const useItems = ({
+  page = 1,
+  limit = 10,
+  search = "",
+}: UseItemsProps = {}) => {
   const { status } = useSession();
+  const query = search.trim();
   return useQuery<PaginatedItemsResponse>({
-    queryKey: ["items", { page, limit }],
+    queryKey: ["items", { page, limit, search: query }],
     queryFn: async () => {
       if (status !== "authenticated")
         throw new Error("Authentication required.");
-      const response = await fetch(`/api/items?page=${page}&limit=${limit}`);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+      });
+      if (query) params.set("q", query);
+      const response = await fetch(`/api/items?${params}`);
       return handleApiResponse(response);
     },
     enabled: status === "authenticated",
+    // Keep showing the current list while a new search or page loads
+    placeholderData: keepPreviousData,
   });
 };
 
