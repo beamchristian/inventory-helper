@@ -7,6 +7,8 @@ import {
   isUniqueConstraintError,
   normalizeUpc,
   UPC_REQUIRED_MESSAGE,
+  CASE_QUANTITY_MESSAGE,
+  parseCaseQuantity,
 } from "@/lib/items";
 
 async function getUserIdFromSession() {
@@ -82,6 +84,7 @@ export async function POST(request: Request) {
       name,
       upc_number,
       average_weight_per_unit,
+      case_quantity,
       unit_type,
       item_type,
       brand,
@@ -97,6 +100,15 @@ export async function POST(request: Request) {
     // Ensure average_weight_per_unit is null if unit_type is 'quantity'
     const finalAverageWeight =
       unit_type === "quantity" ? null : average_weight_per_unit;
+
+    // Units per case is optional, but must be a whole number when given
+    const caseQuantity = parseCaseQuantity(case_quantity);
+    if (caseQuantity === undefined) {
+      return NextResponse.json(
+        { message: CASE_QUANTITY_MESSAGE },
+        { status: 400 },
+      );
+    }
 
     // Every item needs a UPC, and a UPC can only be used once per user
     const upc = normalizeUpc(upc_number);
@@ -120,6 +132,7 @@ export async function POST(request: Request) {
         name: name.trim(),
         upc_number: upc,
         average_weight_per_unit: finalAverageWeight,
+        case_quantity: caseQuantity,
         unit_type,
         item_type: item_type || null,
         brand: brand || null,

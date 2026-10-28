@@ -103,6 +103,7 @@ model Item {
   name                    String
   upc_number              String // Required: every item has a UPC, unique per user
   average_weight_per_unit Float?
+  case_quantity           Int? // Optional: number of units in one case
   unit_type               String // Consider making this an enum (e.g., `enum UnitType { QUANTITY, WEIGHT } @@schema("public")`)
   item_type               String?
   brand                   String?

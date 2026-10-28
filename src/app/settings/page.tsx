@@ -76,6 +76,7 @@ export default function SettingsPage() {
     name: "",
     upc_number: "",
     average_weight_per_unit: null,
+    case_quantity: null,
     unit_type: "quantity",
     item_type: null,
     brand: null,
@@ -134,6 +135,7 @@ export default function SettingsPage() {
         name: "",
         upc_number: "",
         average_weight_per_unit: null,
+        case_quantity: null,
         unit_type: "quantity",
         item_type: null,
         brand: null,
@@ -385,6 +387,23 @@ export default function SettingsPage() {
               </div>
             )}
             <div>
+              <Label htmlFor='newCaseQuantity'>
+                Units per case{" "}
+                <span className='font-normal text-muted-foreground'>(optional)</span>
+              </Label>
+              <Input
+                type='number'
+                inputMode='numeric'
+                id='newCaseQuantity'
+                name='case_quantity'
+                step='1'
+                min='1'
+                placeholder='e.g. 12'
+                value={newItemForm.case_quantity ?? ""}
+                onChange={handleNewItemChange}
+              />
+            </div>
+            <div>
               <Label htmlFor='newItemType'>Type</Label>
               <Input
                 type='text'
@@ -547,6 +566,21 @@ export default function SettingsPage() {
                           />
                         </div>
                       )}
+                      <div>
+                        <Label htmlFor={`edit-case-${item.id}`} className='text-xs'>
+                          Units per case (optional)
+                        </Label>
+                        <Input
+                          id={`edit-case-${item.id}`}
+                          type='number'
+                          inputMode='numeric'
+                          name='case_quantity'
+                          step='1'
+                          min='1'
+                          value={editingItem.case_quantity ?? ""}
+                          onChange={handleEditItemChange}
+                        />
+                      </div>
                       <div className='col-span-full flex justify-end gap-2'>
                         <Button
                           type='button'

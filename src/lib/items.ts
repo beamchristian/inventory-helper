@@ -17,6 +17,23 @@ export function normalizeUpc(upc: unknown): string | null {
 
 export const UPC_REQUIRED_MESSAGE = "A UPC is required for every item.";
 
+export const CASE_QUANTITY_MESSAGE =
+  "Case quantity must be a whole number of at least 1, or left empty.";
+
+/**
+ * Parses the optional units-per-case value. Empty values mean "no case
+ * quantity" (null); anything else must be a whole number of at least 1.
+ * Returns undefined when the value is invalid.
+ */
+export function parseCaseQuantity(value: unknown): number | null | undefined {
+  if (value === null || value === undefined || value === "") return null;
+  const num = typeof value === "string" ? Number(value) : value;
+  if (typeof num !== "number" || !Number.isInteger(num) || num < 1) {
+    return undefined;
+  }
+  return num;
+}
+
 /** Finds another of the user's items that already uses this UPC. */
 export async function findDuplicateItem(
   userId: string,

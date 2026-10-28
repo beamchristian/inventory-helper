@@ -69,6 +69,7 @@ export async function POST(request: Request) {
         name: item.name.trim(),
         upc_number: upc,
         average_weight_per_unit: item.average_weight_per_unit,
+        case_quantity: item.case_quantity,
         unit_type: item.unit_type,
         item_type: item.item_type,
         brand: item.brand,

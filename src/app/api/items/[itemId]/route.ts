@@ -9,6 +9,8 @@ import {
   isUniqueConstraintError,
   normalizeUpc,
   UPC_REQUIRED_MESSAGE,
+  CASE_QUANTITY_MESSAGE,
+  parseCaseQuantity,
 } from "@/lib/items";
 
 // REFACTORED: Centralized error handler to reduce repetition.
@@ -137,6 +139,16 @@ export async function PATCH(
     if ("unit_type" in body) data.unit_type = body.unit_type;
     if ("average_weight_per_unit" in body) {
       data.average_weight_per_unit = body.average_weight_per_unit;
+    }
+    if ("case_quantity" in body) {
+      const caseQuantity = parseCaseQuantity(body.case_quantity);
+      if (caseQuantity === undefined) {
+        return NextResponse.json(
+          { message: CASE_QUANTITY_MESSAGE },
+          { status: 400 }
+        );
+      }
+      data.case_quantity = caseQuantity;
     }
     if ("item_type" in body) data.item_type = body.item_type || null;
     if ("brand" in body) data.brand = body.brand || null;

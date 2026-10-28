@@ -4,6 +4,7 @@ export interface Item {
   name: string;
   upc_number: string;
   average_weight_per_unit: number | null;
+  case_quantity: number | null; // units per case, optional
   unit_type: "quantity" | "weight";
   item_type: string | null;
   brand: string | null;
