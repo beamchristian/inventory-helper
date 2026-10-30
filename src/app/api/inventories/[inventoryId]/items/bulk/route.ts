@@ -16,7 +16,7 @@ export async function POST(
   req: NextRequest,
   context: {
     params: Promise<{ inventoryId: string }>;
-  }
+  },
 ): Promise<NextResponse> {
   try {
     const session = await auth();
@@ -29,7 +29,7 @@ export async function POST(
     if (!inventoryId) {
       return NextResponse.json(
         { message: "Inventory ID is required." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -44,7 +44,7 @@ export async function POST(
     if (!inventory) {
       return NextResponse.json(
         { message: "Inventory not found or unauthorized." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -58,7 +58,7 @@ export async function POST(
       },
     });
     const allUserMasterItemIds = new Set(
-      allUserMasterItems.map((item) => item.id)
+      allUserMasterItems.map((item) => item.id),
     );
 
     // 3. Fetch all items currently in this specific inventory
@@ -71,12 +71,12 @@ export async function POST(
       },
     });
     const existingInventoryItemIds = new Set(
-      currentInventoryItems.map((invItem) => invItem.item_id)
+      currentInventoryItems.map((invItem) => invItem.item_id),
     );
 
     // 4. Determine which master items are NOT yet in this inventory
     const itemsToAddToInventory = Array.from(allUserMasterItemIds).filter(
-      (masterItemId) => !existingInventoryItemIds.has(masterItemId)
+      (masterItemId) => !existingInventoryItemIds.has(masterItemId),
     );
 
     if (itemsToAddToInventory.length === 0) {
@@ -85,7 +85,7 @@ export async function POST(
           message: "All available items are already in this inventory.",
           countAdded: 0,
         },
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -106,7 +106,7 @@ export async function POST(
 
     return NextResponse.json(
       { message: "Items added successfully.", countAdded: result.count },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error: unknown) {
     console.error("Error bulk adding items to inventory:", error);
@@ -117,7 +117,63 @@ export async function POST(
         message: "Failed to bulk add items to inventory.",
         error: errorMessage,
       },
-      { status: 500 }
+      { status: 500 },
+    );
+  }
+}
+
+/**
+ * Handles PATCH requests to move every entered item in an Inventory back to
+ * the "to enter" list at once (sets is_entered = false on all of them).
+ *
+ * @returns The response object with the number of items moved back.
+ */
+export async function PATCH(
+  _req: NextRequest,
+  context: {
+    params: Promise<{ inventoryId: string }>;
+  },
+): Promise<NextResponse> {
+  try {
+    const session = await auth();
+
+    if (!session || !session.user || !session.user.id) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    const inventoryId = (await context.params).inventoryId;
+
+    // Verify the inventory exists and belongs to the user
+    const inventory = await db.inventory.findFirst({
+      where: { id: inventoryId, userId: session.user.id },
+      select: { id: true },
+    });
+
+    if (!inventory) {
+      return NextResponse.json(
+        { message: "Inventory not found or unauthorized." },
+        { status: 404 },
+      );
+    }
+
+    const result = await db.inventoryItem.updateMany({
+      where: { inventory_id: inventoryId, is_entered: true },
+      data: { is_entered: false },
+    });
+
+    return NextResponse.json(
+      { message: "Entered items moved back.", countUpdated: result.count },
+      { status: 200 },
+    );
+  } catch (error: unknown) {
+    console.error("Error undoing entered items:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    return NextResponse.json(
+      {
+        message: "Failed to move entered items back.",
+        error: errorMessage,
+      },
+      { status: 500 },
     );
   }
 }

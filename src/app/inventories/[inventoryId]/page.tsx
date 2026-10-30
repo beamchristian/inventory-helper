@@ -11,6 +11,7 @@ import {
   useDeleteInventoryItem,
   useUpdateInventoryItem,
   useAddAllInventoryItems,
+  useUndoAllEnteredItems,
 } from "@/hooks/useInventoryItems";
 import { useUpdateInventory } from "@/hooks/useInventories";
 import { PaginationControls } from "@/components/PaginationControls";
@@ -122,6 +123,7 @@ export default function InventoryDetailPage() {
   const updateInventoryMutation = useUpdateInventory();
   const updateInventoryItemMutation = useUpdateInventoryItem();
   const addAllInventoryItemsMutation = useAddAllInventoryItems();
+  const undoAllEnteredMutation = useUndoAllEnteredItems();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -401,6 +403,35 @@ export default function InventoryDetailPage() {
     } catch (err) {
       showMessage(
         `Error updating item status: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`,
+        "error",
+      );
+    }
+  };
+
+  const handleUndoAllEntered = async () => {
+    const count = enteredItems.length;
+    if (
+      !inventoryId ||
+      count === 0 ||
+      !window.confirm(
+        `Move all ${count} entered ${
+          count === 1 ? "item" : "items"
+        } back to the "Items to enter" list? Their counts are kept.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      const moved = await undoAllEnteredMutation.mutateAsync(inventoryId);
+      showMessage(
+        `Moved ${moved} ${moved === 1 ? "item" : "items"} back to the list.`,
+        "success",
+      );
+    } catch (err) {
+      showMessage(
+        `Error moving items back: ${
           err instanceof Error ? err.message : "Unknown error"
         }`,
         "error",
@@ -896,27 +927,42 @@ export default function InventoryDetailPage() {
 
       {/* Entered items */}
       <Card className="overflow-hidden">
-        <button
-          onClick={() => setShowEntered(!isEnteredOpen)}
-          className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-muted/40"
-          aria-expanded={isEnteredOpen}
-        >
-          <span className="flex items-center gap-2 text-base font-semibold text-foreground">
-            <CheckCircle2 className="size-4 text-success" />
-            Entered items
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {search
-                ? `${filteredEntered.length} of ${enteredItems.length}`
-                : enteredItems.length}
+        <div className="flex items-center">
+          <button
+            onClick={() => setShowEntered(!isEnteredOpen)}
+            className="flex flex-1 items-center justify-between px-5 py-4 text-left transition-colors hover:bg-muted/40"
+            aria-expanded={isEnteredOpen}
+          >
+            <span className="flex items-center gap-2 text-base font-semibold text-foreground">
+              <CheckCircle2 className="size-4 text-success" />
+              Entered items
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {search
+                  ? `${filteredEntered.length} of ${enteredItems.length}`
+                  : enteredItems.length}
+              </span>
             </span>
-          </span>
-          <ChevronDown
-            className={cn(
-              "size-4 text-muted-foreground transition-transform",
-              isEnteredOpen && "rotate-180",
-            )}
-          />
-        </button>
+            <ChevronDown
+              className={cn(
+                "size-4 text-muted-foreground transition-transform",
+                isEnteredOpen && "rotate-180",
+              )}
+            />
+          </button>
+          {enteredItems.length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mx-3 shrink-0"
+              onClick={handleUndoAllEntered}
+              disabled={undoAllEnteredMutation.isPending}
+              title="Move every entered item back to the Items to enter list"
+            >
+              <RotateCcw />
+              {undoAllEnteredMutation.isPending ? "Moving..." : "Undo all"}
+            </Button>
+          )}
+        </div>
         {isEnteredOpen && (
           <div className="border-t border-border">
             {enteredItems.length === 0 ? (

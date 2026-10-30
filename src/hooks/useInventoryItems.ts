@@ -33,7 +33,7 @@ const API_INVENTORY_ITEMS_BASE_URL = "/api/inventories";
  */
 export const useInventoryItems = (
   inventoryId: string | undefined,
-  sort?: SortParams
+  sort?: SortParams,
 ) => {
   // Fixed: Only destructure `status` if `data` (sessionData) itself is not used directly
   const { status } = useSession(); // Renamed to sessionInfo for clarity
@@ -49,7 +49,7 @@ export const useInventoryItems = (
       }
 
       const response = await fetch(
-        `${API_INVENTORY_ITEMS_BASE_URL}/${inventoryId}/items`
+        `${API_INVENTORY_ITEMS_BASE_URL}/${inventoryId}/items`,
       );
 
       if (!response.ok) {
@@ -58,7 +58,7 @@ export const useInventoryItems = (
           .catch(() => ({ message: response.statusText }));
         throw new Error(
           errorData.message ||
-            `Failed to fetch inventory items: ${response.status}`
+            `Failed to fetch inventory items: ${response.status}`,
         );
       }
       const data: CombinedInventoryItem[] = await response.json();
@@ -155,7 +155,7 @@ export const useAddInventoryItem = () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(newItemData),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -164,7 +164,7 @@ export const useAddInventoryItem = () => {
           .catch(() => ({ message: response.statusText }));
         throw new Error(
           errorData.message ||
-            `Failed to add item to inventory: ${response.status}`
+            `Failed to add item to inventory: ${response.status}`,
         );
       }
       return response.json();
@@ -203,7 +203,7 @@ export const useAddAllInventoryItems = () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -212,7 +212,7 @@ export const useAddAllInventoryItems = () => {
           .catch(() => ({ message: response.statusText }));
         throw new Error(
           errorData.message ||
-            `Failed to add all items to inventory: ${response.status}`
+            `Failed to add all items to inventory: ${response.status}`,
         );
       }
       const result = await response.json();
@@ -226,11 +226,47 @@ export const useAddAllInventoryItems = () => {
       queryClient.invalidateQueries({ queryKey: ["inventory", inventoryId] });
       queryClient.invalidateQueries({ queryKey: ["items"] });
       console.log(
-        `Successfully added ${countAdded} items to inventory ${inventoryId}.`
+        `Successfully added ${countAdded} items to inventory ${inventoryId}.`,
       );
     },
     onError: (error) => {
       console.error("Error adding all inventory items:", error);
+    },
+  });
+};
+
+/**
+ * useUndoAllEnteredItems Hook
+ * Moves every entered item in an inventory back to the "to enter" list.
+ * Returns the number of items moved.
+ */
+export const useUndoAllEnteredItems = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<number, Error, string>({
+    mutationFn: async (inventoryId) => {
+      const response = await fetch(
+        `${API_INVENTORY_ITEMS_BASE_URL}/${inventoryId}/items/bulk`,
+        { method: "PATCH" },
+      );
+
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ message: response.statusText }));
+        throw new Error(
+          errorData.message ||
+            `Failed to move entered items back: ${response.status}`,
+        );
+      }
+      const result = await response.json();
+      return result.countUpdated;
+    },
+    onSuccess: (_count, inventoryId) => {
+      queryClient.invalidateQueries({
+        queryKey: ["inventoryItems", inventoryId],
+        exact: false,
+      });
     },
   });
 };
@@ -258,7 +294,7 @@ export const useDeleteInventoryItem = () => {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ inventoryItemId }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -267,7 +303,7 @@ export const useDeleteInventoryItem = () => {
           .catch(() => ({ message: response.statusText }));
         throw new Error(
           errorData.message ||
-            `Failed to delete inventory item: ${response.status}`
+            `Failed to delete inventory item: ${response.status}`,
         );
       }
       return;
@@ -312,7 +348,7 @@ export const useUpdateInventoryItem = () => {
           headers: { "Content-Type": "application/json" },
           // Send only the fields that need to be updated
           body: JSON.stringify(payload),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -321,7 +357,7 @@ export const useUpdateInventoryItem = () => {
           .catch(() => ({ message: response.statusText }));
         throw new Error(
           errorData.message ||
-            `Failed to update inventory item: ${response.status}`
+            `Failed to update inventory item: ${response.status}`,
         );
       }
       return response.json();
