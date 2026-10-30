@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/card";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { SearchInput } from "@/components/ui/search-input";
+import { downloadInventoryExport } from "@/lib/export";
 import {
   ArrowDown,
   ArrowLeft,
@@ -36,6 +37,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Copy,
+  Download,
   Pencil,
   Plus,
   RotateCcw,
@@ -65,15 +67,15 @@ function SortableTh({
         onClick={() => onSort(column)}
         className={cn(
           "inline-flex items-center gap-1 transition-colors hover:text-foreground",
-          isActive && "text-foreground"
+          isActive && "text-foreground",
         )}
       >
         {label}
         {isActive &&
           (sortDirection === "asc" ? (
-            <ArrowUp className='size-3' />
+            <ArrowUp className="size-3" />
           ) : (
-            <ArrowDown className='size-3' />
+            <ArrowDown className="size-3" />
           ))}
       </button>
     </th>
@@ -127,9 +129,9 @@ export default function InventoryDetailPage() {
     }
   }, [status, router]);
 
-  const { unenteredItems, enteredItems } = useMemo(() => {
+  const { sortedItems, unenteredItems, enteredItems } = useMemo(() => {
     if (!currentInventoryItems) {
-      return { unenteredItems: [], enteredItems: [] };
+      return { sortedItems: [], unenteredItems: [], enteredItems: [] };
     }
     const sortableItems = [...currentInventoryItems];
     sortableItems.sort((a, b) => {
@@ -185,14 +187,21 @@ export default function InventoryDetailPage() {
     });
     const unentered = sortableItems.filter((item) => !item.is_entered);
     const entered = sortableItems.filter((item) => item.is_entered);
-    return { unenteredItems: unentered, enteredItems: entered };
+    return {
+      sortedItems: sortableItems,
+      unenteredItems: unentered,
+      enteredItems: entered,
+    };
   }, [currentInventoryItems, sortColumn, sortDirection]);
 
   // Search filters both lists; the totals above them stay unfiltered
   const search = searchInput.trim().toLowerCase();
   const { filteredUnentered, filteredEntered } = useMemo(() => {
     if (!search) {
-      return { filteredUnentered: unenteredItems, filteredEntered: enteredItems };
+      return {
+        filteredUnentered: unenteredItems,
+        filteredEntered: enteredItems,
+      };
     }
     const matches = (invItem: CombinedInventoryItem) =>
       [
@@ -217,13 +226,12 @@ export default function InventoryDetailPage() {
   }, [filteredUnentered, currentPage, itemsPerPage]);
 
   // A click on the header always wins over the automatic behaviour
-  const isEnteredOpen =
-    showEntered ?? (!!search && filteredEntered.length > 0);
+  const isEnteredOpen = showEntered ?? (!!search && filteredEntered.length > 0);
 
   const availableItemsToAdd = useMemo(() => {
     if (!allUserItems || !currentInventoryItems) return [];
     const currentItemIds = new Set(
-      currentInventoryItems.map((invItem) => invItem.item_id)
+      currentInventoryItems.map((invItem) => invItem.item_id),
     );
     return allUserItems.filter((userItem) => !currentItemIds.has(userItem.id));
   }, [allUserItems, currentInventoryItems]);
@@ -289,7 +297,7 @@ export default function InventoryDetailPage() {
       return;
     }
     const userConfirmed = window.confirm(
-      `Are you sure you want to add all ${availableItemsToAdd.length} remaining items to this inventory?`
+      `Are you sure you want to add all ${availableItemsToAdd.length} remaining items to this inventory?`,
     );
     if (!userConfirmed) return;
     try {
@@ -304,14 +312,14 @@ export default function InventoryDetailPage() {
 
   const handleDeleteInventoryItem = async (
     invItemId: string,
-    itemName: string
+    itemName: string,
   ) => {
     if (!inventoryId) {
       showMessage("Inventory ID is missing.", "error");
       return;
     }
     const userConfirmed = window.confirm(
-      `Are you sure you want to remove "${itemName}" from this inventory?`
+      `Are you sure you want to remove "${itemName}" from this inventory?`,
     );
     if (userConfirmed) {
       try {
@@ -328,7 +336,7 @@ export default function InventoryDetailPage() {
           `Error removing item: ${
             err instanceof Error ? err.message : "Unknown error"
           }`,
-          "error"
+          "error",
         );
       }
     }
@@ -337,17 +345,17 @@ export default function InventoryDetailPage() {
   const handleUpdateCountedUnits = async (
     invItemId: string,
     currentCount: number,
-    itemUnitType: string
+    itemUnitType: string,
   ) => {
     const newCount = prompt(
-      `Enter new count for item (current: ${currentCount} ${itemUnitType}):`
+      `Enter new count for item (current: ${currentCount} ${itemUnitType}):`,
     );
     if (newCount === null) return;
     const parsedCount = parseFloat(newCount);
     if (isNaN(parsedCount) || parsedCount < 0) {
       showMessage(
         "Invalid count. Please enter a non-negative number.",
-        "error"
+        "error",
       );
       return;
     }
@@ -367,14 +375,14 @@ export default function InventoryDetailPage() {
         `Error updating item count: ${
           err instanceof Error ? err.message : "Unknown error"
         }`,
-        "error"
+        "error",
       );
     }
   };
 
   const handleToggleEntered = async (
     invItemId: string,
-    isEntering: boolean
+    isEntering: boolean,
   ) => {
     if (!inventoryId) {
       showMessage("Inventory ID is missing.", "error");
@@ -388,14 +396,14 @@ export default function InventoryDetailPage() {
       });
       showMessage(
         isEntering ? "Item marked as entered." : "Item moved back to list.",
-        "success"
+        "success",
       );
     } catch (err) {
       showMessage(
         `Error updating item status: ${
           err instanceof Error ? err.message : "Unknown error"
         }`,
-        "error"
+        "error",
       );
     }
   };
@@ -410,7 +418,7 @@ export default function InventoryDetailPage() {
       return;
     }
     const userConfirmed = window.confirm(
-      "Are you sure you want to complete this inventory? This action cannot be undone."
+      "Are you sure you want to complete this inventory? This action cannot be undone.",
     );
     if (userConfirmed) {
       try {
@@ -420,35 +428,40 @@ export default function InventoryDetailPage() {
         });
         showMessage(
           `Inventory "${inventory.name}" has been marked as completed.`,
-          "success"
+          "success",
         );
       } catch (err) {
         showMessage(
           `Error completing inventory: ${
             err instanceof Error ? err.message : "Unknown error"
           }`,
-          "error"
+          "error",
         );
       }
     }
   };
 
   if (isInventoryLoading || isAllItemsLoading || isCurrentItemsLoading) {
-    return <LoadingSpinner className='min-h-[60vh]' />;
+    return <LoadingSpinner className="min-h-[60vh]" />;
   }
 
-  if (isInventoryError || isAllItemsError || isCurrentItemsError || !inventory) {
+  if (
+    isInventoryError ||
+    isAllItemsError ||
+    isCurrentItemsError ||
+    !inventory
+  ) {
     const errorMessage = !inventory
       ? "Inventory not found."
       : inventoryError?.message ||
         allItemsError?.message ||
         currentItemsError?.message;
     return (
-      <PageContainer className='max-w-md'>
+      <PageContainer className="max-w-md">
         <Card>
-          <CardContent className='text-center'>
-            <p className='mb-4 text-sm text-destructive'>{errorMessage}</p>
-            <Button variant='outline' onClick={() => router.push("/")}>
+          <CardContent className="text-center">
+            <p className="mb-4 text-sm text-destructive">{errorMessage}</p>
+            <Button variant="outline" onClick={() => router.push("/")}>
               <ArrowLeft />
               Back to inventories
             </Button>
@@ -467,20 +480,21 @@ export default function InventoryDetailPage() {
     ).toFixed(2)} lbs`;
   const totalItemCount = unenteredItems.length + enteredItems.length;
   const isAddBusy =
-    addInventoryItemMutation.isPending || addAllInventoryItemsMutation.isPending;
+    addInventoryItemMutation.isPending ||
+    addAllInventoryItemsMutation.isPending;
   const sortProps = { sortColumn, sortDirection, onSort: handleSort };
 
   return (
     <PageContainer>
       <div
-        id='messageBox'
-        className='fixed bottom-4 right-4 z-50 hidden rounded-md border bg-card px-4 py-3 text-sm shadow-lg'
+        id="messageBox"
+        className="fixed bottom-4 right-4 z-50 hidden rounded-md border bg-card px-4 py-3 text-sm shadow-lg"
       ></div>
 
       <Button
-        variant='ghost'
-        size='sm'
-        className='-ml-3 mb-3 text-muted-foreground'
+        variant="ghost"
+        size="sm"
+        className="-ml-3 mb-3 text-muted-foreground"
         onClick={() => router.push("/")}
       >
         <ArrowLeft />
@@ -490,7 +504,7 @@ export default function InventoryDetailPage() {
       <PageHeader
         title={inventory.name}
         description={
-          <span className='flex flex-wrap items-center gap-x-3 gap-y-1'>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <StatusBadge status={inventory.status} />
             <span>
               Created {new Date(inventory.created_at).toLocaleDateString()} at{" "}
@@ -502,38 +516,51 @@ export default function InventoryDetailPage() {
           </span>
         }
         actions={
-          inventory.status !== "completed" ? (
+          <>
             <Button
-              variant='success'
-              onClick={handleCompleteInventory}
-              disabled={updateInventoryMutation.isPending}
+              variant="outline"
+              onClick={() =>
+                downloadInventoryExport(inventory.name, sortedItems)
+              }
+              disabled={sortedItems.length === 0}
+              title="Download a .txt file for the inventory system"
             >
-              <CheckCircle2 />
-              {updateInventoryMutation.isPending
-                ? "Completing..."
-                : "Complete inventory"}
+              <Download />
+              Export .txt
             </Button>
-          ) : (
-            <span className='inline-flex items-center gap-1.5 text-sm font-medium text-success'>
-              <CheckCircle2 className='size-4' />
-              Inventory completed
-            </span>
-          )
+            {inventory.status !== "completed" ? (
+              <Button
+                variant="success"
+                onClick={handleCompleteInventory}
+                disabled={updateInventoryMutation.isPending}
+              >
+                <CheckCircle2 />
+                {updateInventoryMutation.isPending
+                  ? "Completing..."
+                  : "Complete inventory"}
+              </Button>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
+                <CheckCircle2 className="size-4" />
+                Inventory completed
+              </span>
+            )}
+          </>
         }
       />
 
       {/* Summary stats */}
-      <div className='mb-6 grid grid-cols-3 gap-3'>
+      <div className="mb-6 grid grid-cols-3 gap-3">
         {[
           { label: "Total items", value: totalItemCount },
           { label: "To enter", value: unenteredItems.length },
           { label: "Entered", value: enteredItems.length },
         ].map((stat) => (
-          <Card key={stat.label} className='px-4 py-3'>
-            <p className='text-xs font-medium text-muted-foreground'>
+          <Card key={stat.label} className="px-4 py-3">
+            <p className="text-xs font-medium text-muted-foreground">
               {stat.label}
             </p>
-            <p className='mt-1 text-2xl font-semibold tabular-nums text-foreground'>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-foreground">
               {stat.value}
             </p>
           </Card>
@@ -541,23 +568,23 @@ export default function InventoryDetailPage() {
       </div>
 
       {/* Add items */}
-      <Card className='mb-6'>
-        <CardContent className='flex flex-col gap-3 sm:flex-row sm:items-center'>
+      <Card className="mb-6">
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <label
-            htmlFor='selectItem'
-            className='shrink-0 text-sm font-medium text-foreground'
+            htmlFor="selectItem"
+            className="shrink-0 text-sm font-medium text-foreground"
           >
             Add item
           </label>
           <Select
-            id='selectItem'
+            id="selectItem"
             value={selectedItemIdToAdd}
             onChange={(e) => setSelectedItemIdToAdd(e.target.value)}
-            className='sm:flex-1'
+            className="sm:flex-1"
             disabled={isAddBusy || availableItemsToAdd.length === 0}
           >
             {availableItemsToAdd.length === 0 ? (
-              <option value=''>All items have been added</option>
+              <option value="">All items have been added</option>
             ) : (
               availableItemsToAdd.map((item: Item) => (
                 <option key={item.id} value={item.id}>
@@ -566,7 +593,7 @@ export default function InventoryDetailPage() {
               ))
             )}
           </Select>
-          <div className='flex gap-2'>
+          <div className="flex gap-2">
             <Button
               onClick={handleAddItemToInventory}
               disabled={
@@ -574,16 +601,16 @@ export default function InventoryDetailPage() {
                 availableItemsToAdd.length === 0 ||
                 !selectedItemIdToAdd
               }
-              className='flex-1 sm:flex-none'
+              className="flex-1 sm:flex-none"
             >
               <Plus />
               {addInventoryItemMutation.isPending ? "Adding..." : "Add"}
             </Button>
             <Button
-              variant='outline'
+              variant="outline"
               onClick={handleAddAllRemainingItemsToInventory}
               disabled={isAddBusy || availableItemsToAdd.length === 0}
-              className='flex-1 sm:flex-none'
+              className="flex-1 sm:flex-none"
             >
               {addAllInventoryItemsMutation.isPending
                 ? "Adding all..."
@@ -594,7 +621,7 @@ export default function InventoryDetailPage() {
       </Card>
 
       {/* Items to enter */}
-      <Card className='mb-6 overflow-hidden'>
+      <Card className="mb-6 overflow-hidden">
         <CardHeader>
           <div>
             <CardTitle>Items to enter</CardTitle>
@@ -608,17 +635,17 @@ export default function InventoryDetailPage() {
               setSearchInput(value);
               setCurrentPage(1); // results start on the first page
             }}
-            placeholder='Search name, UPC, brand or type'
-            className='w-full sm:w-72'
+            placeholder="Search name, UPC, brand or type"
+            className="w-full sm:w-72"
           />
         </CardHeader>
 
         {unenteredItems.length === 0 ? (
-          <p className='px-5 py-12 text-center text-sm text-muted-foreground'>
+          <p className="px-5 py-12 text-center text-sm text-muted-foreground">
             Nothing left to enter. Entered items are listed below.
           </p>
         ) : filteredUnentered.length === 0 ? (
-          <div className='px-5 py-12 text-center text-sm text-muted-foreground'>
+          <div className="px-5 py-12 text-center text-sm text-muted-foreground">
             <p>
               No items to enter match &quot;{searchInput.trim()}&quot;
               {filteredEntered.length > 0 &&
@@ -628,9 +655,9 @@ export default function InventoryDetailPage() {
               .
             </p>
             <Button
-              variant='link'
-              size='sm'
-              className='mt-1'
+              variant="link"
+              size="sm"
+              className="mt-1"
               onClick={() => setSearchInput("")}
             >
               Clear search
@@ -639,119 +666,127 @@ export default function InventoryDetailPage() {
         ) : (
           <>
             {/* Desktop Table */}
-            <div className='hidden overflow-x-auto md:block'>
-              <table className='w-full text-sm'>
-                <thead className='border-b border-border bg-muted/50 text-left text-xs text-muted-foreground'>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border bg-muted/50 text-left text-xs text-muted-foreground">
                   <tr>
-                    <th className='w-12 px-4 py-2.5 text-center font-medium'>
-                      <span className='sr-only'>Entered</span>
+                    <th className="w-12 px-4 py-2.5 text-center font-medium">
+                      <span className="sr-only">Entered</span>
                     </th>
-                    <SortableTh label='Name' column='name' {...sortProps} />
-                    <SortableTh label='UPC' column='upc_number' {...sortProps} />
-                    <SortableTh label='Brand' column='brand' {...sortProps} />
-                    <SortableTh label='Type' column='item_type' {...sortProps} />
+                    <SortableTh label="Name" column="name" {...sortProps} />
                     <SortableTh
-                      label='Count'
-                      column='counted_units'
-                      className='text-right'
+                      label="UPC"
+                      column="upc_number"
+                      {...sortProps}
+                    />
+                    <SortableTh label="Brand" column="brand" {...sortProps} />
+                    <SortableTh
+                      label="Type"
+                      column="item_type"
                       {...sortProps}
                     />
                     <SortableTh
-                      label='Weight'
-                      column='calculated_weight'
-                      className='text-right'
+                      label="Count"
+                      column="counted_units"
+                      className="text-right"
                       {...sortProps}
                     />
-                    <th className='px-4 py-2.5 text-right font-medium'>
-                      <span className='sr-only'>Actions</span>
+                    <SortableTh
+                      label="Weight"
+                      column="calculated_weight"
+                      className="text-right"
+                      {...sortProps}
+                    />
+                    <th className="px-4 py-2.5 text-right font-medium">
+                      <span className="sr-only">Actions</span>
                     </th>
                   </tr>
                 </thead>
-                <tbody className='divide-y divide-border'>
+                <tbody className="divide-y divide-border">
                   {paginatedItems.map((invItem: CombinedInventoryItem) => (
                     <tr
                       key={invItem.id}
-                      className='transition-colors hover:bg-muted/40'
+                      className="transition-colors hover:bg-muted/40"
                     >
-                      <td className='px-4 py-2.5 text-center'>
+                      <td className="px-4 py-2.5 text-center">
                         <input
-                          type='checkbox'
-                          className='size-4 cursor-pointer rounded accent-primary'
+                          type="checkbox"
+                          className="size-4 cursor-pointer rounded accent-primary"
                           onChange={() => handleToggleEntered(invItem.id, true)}
                           aria-label={`Mark ${invItem.item?.name} as entered`}
                         />
                       </td>
-                      <td className='px-4 py-2.5'>
+                      <td className="px-4 py-2.5">
                         <button
                           onClick={() => router.push(itemHref(invItem.id))}
-                          className='text-left font-medium text-foreground hover:text-primary hover:underline'
+                          className="text-left font-medium text-foreground hover:text-primary hover:underline"
                         >
                           {invItem.item?.name || "N/A"}
                         </button>
                       </td>
-                      <td className='px-4 py-2.5 font-mono text-xs text-muted-foreground'>
+                      <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                         {invItem.item?.upc_number || "—"}
                       </td>
-                      <td className='px-4 py-2.5 text-muted-foreground'>
+                      <td className="px-4 py-2.5 text-muted-foreground">
                         {invItem.item?.brand || "—"}
                       </td>
-                      <td className='px-4 py-2.5 capitalize text-muted-foreground'>
+                      <td className="px-4 py-2.5 capitalize text-muted-foreground">
                         {invItem.item?.item_type || "—"}
                       </td>
-                      <td className='px-4 py-2.5 text-right font-medium tabular-nums text-foreground'>
+                      <td className="px-4 py-2.5 text-right font-medium tabular-nums text-foreground">
                         {invItem.counted_units}
                       </td>
-                      <td className='px-4 py-2.5 text-right tabular-nums text-muted-foreground'>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
                         {invItem.item?.unit_type === "weight"
                           ? weightLabel(invItem)
                           : "—"}
                       </td>
-                      <td className='px-4 py-2.5'>
-                        <div className='flex items-center justify-end gap-1'>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-end gap-1">
                           {invItem.counted_units > 0 && (
                             <Button
-                              variant='ghost'
-                              size='icon-sm'
+                              variant="ghost"
+                              size="icon-sm"
                               onClick={() => handleCopyValue(invItem)}
-                              title='Copy value'
-                              aria-label='Copy value'
+                              title="Copy value"
+                              aria-label="Copy value"
                             >
                               <Copy />
                             </Button>
                           )}
                           <Button
-                            variant='ghost'
-                            size='icon-sm'
+                            variant="ghost"
+                            size="icon-sm"
                             onClick={() =>
                               handleUpdateCountedUnits(
                                 invItem.id,
                                 invItem.counted_units,
-                                invItem.item?.unit_type || "units"
+                                invItem.item?.unit_type || "units",
                               )
                             }
-                            title='Quick update count'
-                            aria-label='Quick update count'
+                            title="Quick update count"
+                            aria-label="Quick update count"
                           >
                             <Pencil />
                           </Button>
                           <Button
-                            variant='ghost-destructive'
-                            size='icon-sm'
+                            variant="ghost-destructive"
+                            size="icon-sm"
                             onClick={() =>
                               handleDeleteInventoryItem(
                                 invItem.id,
-                                invItem.item?.name || "Unknown"
+                                invItem.item?.name || "Unknown",
                               )
                             }
-                            title='Remove from inventory'
-                            aria-label='Remove from inventory'
+                            title="Remove from inventory"
+                            aria-label="Remove from inventory"
                           >
                             <Trash2 />
                           </Button>
                           <Button
-                            variant='outline'
-                            size='sm'
-                            className='ml-1'
+                            variant="outline"
+                            size="sm"
+                            className="ml-1"
                             onClick={() => router.push(itemHref(invItem.id))}
                           >
                             Count
@@ -765,45 +800,45 @@ export default function InventoryDetailPage() {
             </div>
 
             {/* Mobile list */}
-            <ul className='divide-y divide-border md:hidden'>
+            <ul className="divide-y divide-border md:hidden">
               {paginatedItems.map((invItem: CombinedInventoryItem) => (
-                <li key={invItem.id} className='px-4 py-3'>
-                  <div className='flex items-start gap-3'>
+                <li key={invItem.id} className="px-4 py-3">
+                  <div className="flex items-start gap-3">
                     <input
-                      type='checkbox'
-                      className='mt-0.5 size-5 shrink-0 cursor-pointer rounded accent-primary'
+                      type="checkbox"
+                      className="mt-0.5 size-5 shrink-0 cursor-pointer rounded accent-primary"
                       onChange={() => handleToggleEntered(invItem.id, true)}
                       aria-label={`Mark ${invItem.item?.name} as entered`}
                     />
                     <button
                       onClick={() => router.push(itemHref(invItem.id))}
-                      className='min-w-0 flex-1 text-left'
+                      className="min-w-0 flex-1 text-left"
                     >
-                      <p className='truncate font-medium text-foreground'>
+                      <p className="truncate font-medium text-foreground">
                         {invItem.item?.name || "N/A"}
                       </p>
-                      <p className='mt-0.5 truncate text-xs capitalize text-muted-foreground'>
+                      <p className="mt-0.5 truncate text-xs capitalize text-muted-foreground">
                         {[invItem.item?.item_type, invItem.item?.brand]
                           .filter(Boolean)
                           .join(" · ") || "—"}
                       </p>
                     </button>
-                    <div className='shrink-0 text-right'>
-                      <p className='font-semibold tabular-nums text-foreground'>
+                    <div className="shrink-0 text-right">
+                      <p className="font-semibold tabular-nums text-foreground">
                         {invItem.counted_units}
                       </p>
                       {invItem.item?.unit_type === "weight" && (
-                        <p className='text-xs tabular-nums text-muted-foreground'>
+                        <p className="text-xs tabular-nums text-muted-foreground">
                           {weightLabel(invItem)}
                         </p>
                       )}
                     </div>
                   </div>
-                  <div className='mt-2 flex justify-end gap-1 pl-8'>
+                  <div className="mt-2 flex justify-end gap-1 pl-8">
                     {invItem.counted_units > 0 && (
                       <Button
-                        variant='ghost'
-                        size='sm'
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleCopyValue(invItem)}
                       >
                         <Copy />
@@ -811,13 +846,13 @@ export default function InventoryDetailPage() {
                       </Button>
                     )}
                     <Button
-                      variant='ghost'
-                      size='sm'
+                      variant="ghost"
+                      size="sm"
                       onClick={() =>
                         handleUpdateCountedUnits(
                           invItem.id,
                           invItem.counted_units,
-                          invItem.item?.unit_type || "units"
+                          invItem.item?.unit_type || "units",
                         )
                       }
                     >
@@ -825,15 +860,15 @@ export default function InventoryDetailPage() {
                       Update
                     </Button>
                     <Button
-                      variant='ghost-destructive'
-                      size='icon-sm'
+                      variant="ghost-destructive"
+                      size="icon-sm"
                       onClick={() =>
                         handleDeleteInventoryItem(
                           invItem.id,
-                          invItem.item?.name || "Unknown"
+                          invItem.item?.name || "Unknown",
                         )
                       }
-                      aria-label='Remove from inventory'
+                      aria-label="Remove from inventory"
                     >
                       <Trash2 />
                     </Button>
@@ -842,7 +877,7 @@ export default function InventoryDetailPage() {
               ))}
             </ul>
 
-            <p className='border-t border-border px-5 py-2.5 text-xs text-muted-foreground'>
+            <p className="border-t border-border px-5 py-2.5 text-xs text-muted-foreground">
               Showing {paginatedItems.length} of {filteredUnentered.length}{" "}
               {search ? "matching" : "remaining"}{" "}
               {filteredUnentered.length === 1 ? "item" : "items"}
@@ -860,16 +895,16 @@ export default function InventoryDetailPage() {
       </Card>
 
       {/* Entered items */}
-      <Card className='overflow-hidden'>
+      <Card className="overflow-hidden">
         <button
           onClick={() => setShowEntered(!isEnteredOpen)}
-          className='flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-muted/40'
+          className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-muted/40"
           aria-expanded={isEnteredOpen}
         >
-          <span className='flex items-center gap-2 text-base font-semibold text-foreground'>
-            <CheckCircle2 className='size-4 text-success' />
+          <span className="flex items-center gap-2 text-base font-semibold text-foreground">
+            <CheckCircle2 className="size-4 text-success" />
             Entered items
-            <span className='rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground'>
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
               {search
                 ? `${filteredEntered.length} of ${enteredItems.length}`
                 : enteredItems.length}
@@ -878,35 +913,35 @@ export default function InventoryDetailPage() {
           <ChevronDown
             className={cn(
               "size-4 text-muted-foreground transition-transform",
-              isEnteredOpen && "rotate-180"
+              isEnteredOpen && "rotate-180",
             )}
           />
         </button>
         {isEnteredOpen && (
-          <div className='border-t border-border'>
+          <div className="border-t border-border">
             {enteredItems.length === 0 ? (
-              <p className='px-5 py-8 text-center text-sm text-muted-foreground'>
+              <p className="px-5 py-8 text-center text-sm text-muted-foreground">
                 No items have been marked as entered yet.
               </p>
             ) : filteredEntered.length === 0 ? (
-              <p className='px-5 py-8 text-center text-sm text-muted-foreground'>
+              <p className="px-5 py-8 text-center text-sm text-muted-foreground">
                 No entered items match &quot;{searchInput.trim()}&quot;.
               </p>
             ) : (
-              <ul className='divide-y divide-border'>
+              <ul className="divide-y divide-border">
                 {filteredEntered.map((item: CombinedInventoryItem) => (
                   <li
                     key={item.id}
-                    className='flex items-center justify-between gap-3 px-5 py-2.5'
+                    className="flex items-center justify-between gap-3 px-5 py-2.5"
                   >
-                    <span className='truncate text-sm text-muted-foreground line-through decoration-muted-foreground/40'>
+                    <span className="truncate text-sm text-muted-foreground line-through decoration-muted-foreground/40">
                       {item.item?.name || "N/A"}
                     </span>
                     <Button
-                      variant='ghost'
-                      size='sm'
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleToggleEntered(item.id, false)}
-                      title='Move back to main list'
+                      title="Move back to main list"
                     >
                       <RotateCcw />
                       Undo
