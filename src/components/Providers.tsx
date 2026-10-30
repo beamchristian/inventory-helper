@@ -5,6 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { Session } from "next-auth"; // Import Session type
+import { DialogProvider } from "@/components/DialogProvider";
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -26,7 +27,9 @@ export default function Providers({ children, session }: ProvidersProps) {
   // NEW: Accept session prop
   return (
     <SessionProvider session={session}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>{children}</DialogProvider>
+      </QueryClientProvider>
     </SessionProvider>
   );
 }

@@ -31,6 +31,7 @@ import {
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { SearchInput } from "@/components/ui/search-input";
 import { downloadInventoryExport } from "@/lib/export";
+import { useDialog } from "@/components/DialogProvider";
 import {
   ArrowDown,
   ArrowLeft,
@@ -124,6 +125,7 @@ export default function InventoryDetailPage() {
   const updateInventoryItemMutation = useUpdateInventoryItem();
   const addAllInventoryItemsMutation = useAddAllInventoryItems();
   const undoAllEnteredMutation = useUndoAllEnteredItems();
+  const dialog = useDialog();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -298,9 +300,11 @@ export default function InventoryDetailPage() {
       showMessage("All available items are already in this inventory.", "info");
       return;
     }
-    const userConfirmed = window.confirm(
-      `Are you sure you want to add all ${availableItemsToAdd.length} remaining items to this inventory?`,
-    );
+    const userConfirmed = await dialog.confirm({
+      title: "Add all remaining items?",
+      message: `All ${availableItemsToAdd.length} items that aren't in this inventory yet will be added with a count of 0.`,
+      confirmLabel: "Add all",
+    });
     if (!userConfirmed) return;
     try {
       await addAllInventoryItemsMutation.mutateAsync(inventoryId);
@@ -320,9 +324,12 @@ export default function InventoryDetailPage() {
       showMessage("Inventory ID is missing.", "error");
       return;
     }
-    const userConfirmed = window.confirm(
-      `Are you sure you want to remove "${itemName}" from this inventory?`,
-    );
+    const userConfirmed = await dialog.confirm({
+      title: "Remove item?",
+      message: `"${itemName}" and its count will be removed from this inventory. The item stays on your Items page.`,
+      confirmLabel: "Remove",
+      destructive: true,
+    });
     if (userConfirmed) {
       try {
         await deleteInventoryItemMutation.mutateAsync({
@@ -349,18 +356,27 @@ export default function InventoryDetailPage() {
     currentCount: number,
     itemUnitType: string,
   ) => {
-    const newCount = prompt(
-      `Enter new count for item (current: ${currentCount} ${itemUnitType}):`,
-    );
+    const newCount = await dialog.prompt({
+      title: "Update count",
+      message: `Current count: ${currentCount} (${itemUnitType})`,
+      label: "New count",
+      inputType: "number",
+      step: itemUnitType === "quantity" ? "1" : "any",
+      min: "0",
+      defaultValue: String(currentCount),
+      validate: (value) => {
+        const parsed = parseFloat(value);
+        if (value.trim() === "" || isNaN(parsed) || parsed < 0) {
+          return "Enter a number of 0 or more.";
+        }
+        if (itemUnitType === "quantity" && !Number.isInteger(parsed)) {
+          return "Quantity items need a whole number.";
+        }
+        return null;
+      },
+    });
     if (newCount === null) return;
     const parsedCount = parseFloat(newCount);
-    if (isNaN(parsedCount) || parsedCount < 0) {
-      showMessage(
-        "Invalid count. Please enter a non-negative number.",
-        "error",
-      );
-      return;
-    }
     if (!inventoryId) {
       showMessage("Inventory ID is missing.", "error");
       return;
@@ -415,11 +431,13 @@ export default function InventoryDetailPage() {
     if (
       !inventoryId ||
       count === 0 ||
-      !window.confirm(
-        `Move all ${count} entered ${
+      !(await dialog.confirm({
+        title: "Undo all entered items?",
+        message: `All ${count} entered ${
           count === 1 ? "item" : "items"
-        } back to the "Items to enter" list? Their counts are kept.`,
-      )
+        } will move back to the "Items to enter" list. Their counts are kept.`,
+        confirmLabel: "Undo all",
+      }))
     ) {
       return;
     }
@@ -448,9 +466,11 @@ export default function InventoryDetailPage() {
       showMessage("This inventory is already completed.", "info");
       return;
     }
-    const userConfirmed = window.confirm(
-      "Are you sure you want to complete this inventory? This action cannot be undone.",
-    );
+    const userConfirmed = await dialog.confirm({
+      title: "Complete inventory?",
+      message: `"${inventory.name}" will be marked as completed. This can't be undone.`,
+      confirmLabel: "Complete inventory",
+    });
     if (userConfirmed) {
       try {
         await updateInventoryMutation.mutateAsync({

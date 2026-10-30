@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
+import { useDialog } from "@/components/DialogProvider";
 import {
   ArrowLeft,
   Check,
@@ -72,7 +73,7 @@ const useInventoryItemDetails = (
 function combineCasesAndUnits(
   casesInput: string,
   unitsInput: string,
-  caseQuantity: number | null
+  caseQuantity: number | null,
 ): number | null {
   const casesText = caseQuantity ? casesInput.trim() : "";
   const unitsText = unitsInput.trim();
@@ -131,16 +132,16 @@ function UnitWeightEditor({
 
   if (!isEditing) {
     return (
-      <div className='mt-0.5 flex items-center gap-1'>
-        <span className='font-medium tabular-nums text-foreground'>
+      <div className="mt-0.5 flex items-center gap-1">
+        <span className="font-medium tabular-nums text-foreground">
           {item.average_weight_per_unit?.toFixed(2) ?? "N/A"} lbs
         </span>
         <Button
-          variant='ghost'
-          size='icon-sm'
+          variant="ghost"
+          size="icon-sm"
           onClick={startEditing}
-          title='Edit average unit weight'
-          aria-label='Edit average unit weight'
+          title="Edit average unit weight"
+          aria-label="Edit average unit weight"
         >
           <Pencil />
         </Button>
@@ -149,56 +150,56 @@ function UnitWeightEditor({
   }
 
   return (
-    <div className='mt-1'>
+    <div className="mt-1">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           save();
         }}
-        className='flex items-center gap-2'
+        className="flex items-center gap-2"
       >
-        <div className='relative w-32'>
+        <div className="relative w-32">
           <Input
-            type='number'
-            inputMode='decimal'
-            step='any'
-            min='0'
+            type="number"
+            inputMode="decimal"
+            step="any"
+            min="0"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => e.key === "Escape" && setIsEditing(false)}
-            aria-label='Average unit weight in pounds'
-            className='h-8 pr-9 tabular-nums'
+            aria-label="Average unit weight in pounds"
+            className="h-8 pr-9 tabular-nums"
             autoFocus
           />
-          <span className='pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground'>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
             lbs
           </span>
         </div>
         <Button
-          type='submit'
-          size='icon-sm'
+          type="submit"
+          size="icon-sm"
           disabled={updateItemMutation.isPending}
-          title='Save'
-          aria-label='Save weight'
+          title="Save"
+          aria-label="Save weight"
         >
           <Check />
         </Button>
         <Button
-          type='button'
-          variant='ghost'
-          size='icon-sm'
+          type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={() => setIsEditing(false)}
           disabled={updateItemMutation.isPending}
-          title='Cancel'
-          aria-label='Cancel editing weight'
+          title="Cancel"
+          aria-label="Cancel editing weight"
         >
           <X />
         </Button>
       </form>
       {error ? (
-        <p className='mt-1.5 text-xs text-destructive'>{error}</p>
+        <p className="mt-1.5 text-xs text-destructive">{error}</p>
       ) : (
-        <p className='mt-1.5 text-xs text-muted-foreground'>
+        <p className="mt-1.5 text-xs text-muted-foreground">
           Updates this item everywhere, including weights in past inventories.
         </p>
       )}
@@ -247,6 +248,7 @@ export default function InventoryItemDetailPage() {
     error: allItemsError,
   } = useInventoryItems(inventoryId);
   const updateInventoryItemMutation = useUpdateInventoryItem();
+  const dialog = useDialog();
 
   // MODIFIED: This now uses the exact same sorting logic as the main page
   const navigableItems = useMemo(() => {
@@ -342,15 +344,24 @@ export default function InventoryItemDetailPage() {
     async (newCount: number) => {
       if (!inventoryItem?.id || !inventoryItem.inventory_id) return;
       if (newCount < 0) {
-        alert("Count cannot go below zero.");
+        await dialog.alert({
+          title: "Count can't go below zero",
+          message: `That would bring the count to ${Number(newCount.toFixed(2))}.`,
+        });
         return;
       }
       if (
         inventoryItem.item?.unit_type === "quantity" &&
         !Number.isInteger(newCount)
       ) {
-        alert("Quantity items must have whole number counts.");
-        newCount = Math.floor(newCount);
+        const rounded = Math.floor(newCount);
+        const useRounded = await dialog.confirm({
+          title: "Whole numbers only",
+          message: `This item is counted by quantity, so the count must be a whole number. Save ${rounded} instead of ${Number(newCount.toFixed(2))}?`,
+          confirmLabel: `Save ${rounded}`,
+        });
+        if (!useRounded) return;
+        newCount = rounded;
       }
       try {
         await updateInventoryItemMutation.mutateAsync({
@@ -365,14 +376,14 @@ export default function InventoryItemDetailPage() {
         setInputValue("");
         setCaseInputValue("");
       } catch (err) {
-        alert(
-          `Error updating count: ${
-            err instanceof Error ? err.message : "Unknown error"
-          }`,
-        );
+        await dialog.alert({
+          title: "Couldn't update the count",
+          message: err instanceof Error ? err.message : "Unknown error",
+        });
       }
     },
     [
+      dialog,
       inventoryItem,
       updateInventoryItemMutation,
       queryClient,
@@ -384,9 +395,16 @@ export default function InventoryItemDetailPage() {
   const handleOperation = (operation: "add" | "subtract" | "replace") => {
     // Combine cases and loose units into one number of units
     const caseQuantity = inventoryItem?.item?.case_quantity ?? null;
-    const value = combineCasesAndUnits(caseInputValue, inputValue, caseQuantity);
+    const value = combineCasesAndUnits(
+      caseInputValue,
+      inputValue,
+      caseQuantity,
+    );
     if (value === null) {
-      alert("Please enter a valid number.");
+      dialog.alert({
+        title: "Enter a number",
+        message: "Type a valid number of units or cases first.",
+      });
       return;
     }
     const currentCount = inventoryItem?.counted_units ?? 0;
@@ -408,7 +426,7 @@ export default function InventoryItemDetailPage() {
   };
 
   if (isInventoryItemLoading || areAllItemsLoading) {
-    return <LoadingSpinner className='min-h-[60vh]' />;
+    return <LoadingSpinner className="min-h-[60vh]" />;
   }
   if (isInventoryItemError || areAllItemsError || !inventoryItem) {
     const errorMsg =
@@ -416,12 +434,12 @@ export default function InventoryItemDetailPage() {
       allItemsError?.message ||
       "Inventory item not found.";
     return (
-      <PageContainer className='max-w-md'>
+      <PageContainer className="max-w-md">
         <Card>
-          <CardContent className='text-center'>
-            <p className='mb-4 text-sm text-destructive'>{errorMsg}</p>
+          <CardContent className="text-center">
+            <p className="mb-4 text-sm text-destructive">{errorMsg}</p>
             <Button
-              variant='outline'
+              variant="outline"
               onClick={() => router.push(`/inventories/${inventoryId}`)}
             >
               <ArrowLeft />
@@ -446,19 +464,20 @@ export default function InventoryItemDetailPage() {
   const enteredTotal = combineCasesAndUnits(
     caseInputValue,
     inputValue,
-    caseQuantity
+    caseQuantity,
   );
   const hasEntry = enteredTotal !== null;
-  const showCaseTotal = caseQuantity !== null && caseInputValue !== "" && hasEntry;
+  const showCaseTotal =
+    caseQuantity !== null && caseInputValue !== "" && hasEntry;
   const fullCases = caseQuantity ? Math.floor(currentCount / caseQuantity) : 0;
   const looseUnits = caseQuantity ? currentCount - fullCases * caseQuantity : 0;
 
   return (
-    <PageContainer className='max-w-2xl'>
+    <PageContainer className="max-w-2xl">
       <Button
-        variant='ghost'
-        size='sm'
-        className='-ml-3 mb-3 text-muted-foreground'
+        variant="ghost"
+        size="sm"
+        className="-ml-3 mb-3 text-muted-foreground"
         onClick={() => router.push(`/inventories/${inventoryId}`)}
       >
         <ArrowLeft />
@@ -468,7 +487,7 @@ export default function InventoryItemDetailPage() {
       <PageHeader
         title={item?.name ?? "Loading..."}
         description={
-          <span className='flex flex-wrap items-center gap-x-3 gap-y-1'>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Badge>{item?.unit_type ?? "N/A"}</Badge>
             {totalItems > 0 && currentIndex >= 0 && (
               <span>
@@ -479,16 +498,16 @@ export default function InventoryItemDetailPage() {
         }
       />
 
-      <Card className='mb-6'>
-        <CardContent className='flex flex-col items-center py-8'>
-          <p className='text-xs font-medium uppercase tracking-wide text-muted-foreground'>
+      <Card className="mb-6">
+        <CardContent className="flex flex-col items-center py-8">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Current count
           </p>
-          <p className='mt-2 text-5xl font-semibold tabular-nums text-foreground'>
+          <p className="mt-2 text-5xl font-semibold tabular-nums text-foreground">
             {currentCount}
           </p>
           {caseQuantity !== null && currentCount > 0 && (
-            <p className='mt-2 text-sm tabular-nums text-muted-foreground'>
+            <p className="mt-2 text-sm tabular-nums text-muted-foreground">
               {fullCases} {fullCases === 1 ? "case" : "cases"}
               {looseUnits > 0 &&
                 ` + ${Number(looseUnits.toFixed(2))} ${
@@ -497,77 +516,77 @@ export default function InventoryItemDetailPage() {
             </p>
           )}
           {calculatedTotalWeight !== null && (
-            <p className='mt-2 text-sm text-muted-foreground'>
+            <p className="mt-2 text-sm text-muted-foreground">
               Total weight{" "}
-              <span className='font-medium tabular-nums text-foreground'>
+              <span className="font-medium tabular-nums text-foreground">
                 {calculatedTotalWeight} lbs
               </span>
             </p>
           )}
 
-          <div className='mt-8 w-full max-w-sm'>
+          <div className="mt-8 w-full max-w-sm">
             {caseQuantity !== null ? (
-              <div className='grid grid-cols-2 gap-2'>
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label
-                    htmlFor='caseInput'
-                    className='mb-1 block text-center text-xs font-medium text-muted-foreground'
+                    htmlFor="caseInput"
+                    className="mb-1 block text-center text-xs font-medium text-muted-foreground"
                   >
                     Cases ({caseQuantity} per case)
                   </label>
                   <Input
-                    id='caseInput'
-                    type='number'
-                    inputMode='numeric'
-                    step='1'
-                    min='0'
+                    id="caseInput"
+                    type="number"
+                    inputMode="numeric"
+                    step="1"
+                    min="0"
                     value={caseInputValue}
                     onChange={(e) => setCaseInputValue(e.target.value)}
-                    placeholder='0'
-                    className='h-12 text-center text-lg'
+                    placeholder="0"
+                    className="h-12 text-center text-lg"
                   />
                 </div>
                 <div>
                   <label
-                    htmlFor='countInput'
-                    className='mb-1 block text-center text-xs font-medium text-muted-foreground'
+                    htmlFor="countInput"
+                    className="mb-1 block text-center text-xs font-medium text-muted-foreground"
                   >
                     Units
                   </label>
                   <Input
-                    id='countInput'
-                    type='number'
-                    inputMode='decimal'
+                    id="countInput"
+                    type="number"
+                    inputMode="decimal"
                     step={item?.unit_type === "quantity" ? "1" : "any"}
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
-                    placeholder='0'
-                    className='h-12 text-center text-lg'
+                    placeholder="0"
+                    className="h-12 text-center text-lg"
                   />
                 </div>
               </div>
             ) : (
               <Input
-                id='countInput'
-                type='number'
-                inputMode='decimal'
+                id="countInput"
+                type="number"
+                inputMode="decimal"
                 step={item?.unit_type === "quantity" ? "1" : "any"}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder='Enter a value'
-                aria-label='Count value'
-                className='h-12 text-center text-lg'
+                placeholder="Enter a value"
+                aria-label="Count value"
+                className="h-12 text-center text-lg"
               />
             )}
             {showCaseTotal && (
-              <p className='mt-1.5 text-center text-xs tabular-nums text-muted-foreground'>
+              <p className="mt-1.5 text-center text-xs tabular-nums text-muted-foreground">
                 Total: {Number(enteredTotal.toFixed(2))} units
               </p>
             )}
-            <div className='mt-3 grid grid-cols-3 gap-2'>
+            <div className="mt-3 grid grid-cols-3 gap-2">
               <Button
-                size='lg'
-                variant='outline'
+                size="lg"
+                variant="outline"
                 onClick={() => handleOperation("subtract")}
                 disabled={isUpdating || !hasEntry}
               >
@@ -575,8 +594,8 @@ export default function InventoryItemDetailPage() {
                 Subtract
               </Button>
               <Button
-                size='lg'
-                variant='outline'
+                size="lg"
+                variant="outline"
                 onClick={() => handleOperation("replace")}
                 disabled={isUpdating || !hasEntry}
               >
@@ -584,7 +603,7 @@ export default function InventoryItemDetailPage() {
                 Set
               </Button>
               <Button
-                size='lg'
+                size="lg"
                 onClick={() => handleOperation("add")}
                 disabled={isUpdating || !hasEntry}
               >
@@ -610,7 +629,7 @@ export default function InventoryItemDetailPage() {
               Next <ChevronRight />
             </>
           }
-          noun='Item'
+          noun="Item"
           showItemsPerPage={false}
         />
       </Card>
@@ -620,7 +639,7 @@ export default function InventoryItemDetailPage() {
           <CardTitle>Item details</CardTitle>
         </CardHeader>
         <CardContent>
-          <dl className='grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2'>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
             {[
               { label: "Name", value: item?.name ?? "N/A" },
               { label: "Count by", value: item?.unit_type ?? "N/A" },
@@ -633,7 +652,7 @@ export default function InventoryItemDetailPage() {
               { label: "Brand", value: item?.brand || "—" },
             ].map((row) => (
               <div key={row.label}>
-                <dt className='text-xs text-muted-foreground'>{row.label}</dt>
+                <dt className="text-xs text-muted-foreground">{row.label}</dt>
                 <dd
                   className={cn(
                     "mt-0.5 font-medium capitalize text-foreground",
@@ -645,8 +664,8 @@ export default function InventoryItemDetailPage() {
               </div>
             ))}
             {item?.unit_type === "weight" && (
-              <div className='sm:col-span-2'>
-                <dt className='text-xs text-muted-foreground'>
+              <div className="sm:col-span-2">
+                <dt className="text-xs text-muted-foreground">
                   Avg. unit weight
                 </dt>
                 <dd>
