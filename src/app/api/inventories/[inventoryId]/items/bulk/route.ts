@@ -52,6 +52,7 @@ export async function POST(
     const allUserMasterItems = await db.item.findMany({
       where: {
         user_id: session.user.id,
+        is_discontinued: false, // discontinued items can't be added
       },
       select: {
         id: true,

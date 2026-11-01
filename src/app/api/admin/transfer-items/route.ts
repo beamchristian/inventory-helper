@@ -26,13 +26,13 @@ export async function POST(request: Request) {
     if (!sourceUserId || !targetUserId) {
       return NextResponse.json(
         { message: "Source and target user IDs are required." },
-        { status: 400 }
+        { status: 400 },
       );
     }
     if (sourceUserId === targetUserId) {
       return NextResponse.json(
         { message: "Source and target users cannot be the same." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       select: { upc_number: true },
     });
     const takenUpcs = new Set(
-      targetItems.map((item) => normalizeUpc(item.upc_number))
+      targetItems.map((item) => normalizeUpc(item.upc_number)),
     );
 
     // 4. Prepare copies of only the new items, assigned to the target user
@@ -70,6 +70,7 @@ export async function POST(request: Request) {
         upc_number: upc,
         average_weight_per_unit: item.average_weight_per_unit,
         case_quantity: item.case_quantity,
+        is_discontinued: item.is_discontinued,
         unit_type: item.unit_type,
         item_type: item.item_type,
         brand: item.brand,
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
       error instanceof Error ? error.message : "An unknown error occurred";
     return NextResponse.json(
       { message: "Failed to copy items", error: errorMessage },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

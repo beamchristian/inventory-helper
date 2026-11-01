@@ -27,8 +27,9 @@ export async function GET(request: NextRequest) {
 
     // Check if the request is for ALL items
     if (searchParams.get("all") === "true") {
+      // Used to pick items for an inventory, so discontinued items are left out
       const allItems = await db.item.findMany({
-        where: { user_id: userId },
+        where: { user_id: userId, is_discontinued: false },
         orderBy: { name: "asc" },
       });
       return NextResponse.json(allItems); // Return a simple array
@@ -41,7 +42,11 @@ export async function GET(request: NextRequest) {
 
     // Optional search across name, UPC, brand and type (case-insensitive)
     const query = searchParams.get("q")?.trim();
-    const where: Prisma.ItemWhereInput = { user_id: userId };
+    // status=discontinued lists discontinued items; anything else lists active ones
+    const where: Prisma.ItemWhereInput = {
+      user_id: userId,
+      is_discontinued: searchParams.get("status") === "discontinued",
+    };
     if (query) {
       where.OR = (["name", "upc_number", "brand", "item_type"] as const).map(
         (field) => ({ [field]: { contains: query, mode: "insensitive" } }),

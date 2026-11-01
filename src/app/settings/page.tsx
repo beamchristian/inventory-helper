@@ -24,6 +24,8 @@ import {
 import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { cn, showMessage } from "@/lib/utils";
 import {
+  Archive,
+  ArchiveRestore,
   ArrowDown,
   ArrowUp,
   Package,
@@ -52,6 +54,10 @@ export default function SettingsPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [searchInput, setSearchInput] = useState("");
+  // Which list is shown: items in use, or discontinued ones kept for later
+  const [listStatus, setListStatus] = useState<"active" | "discontinued">(
+    "active",
+  );
   const search = useDebouncedValue(searchInput.trim());
 
   const {
@@ -64,6 +70,7 @@ export default function SettingsPage() {
     page: currentPage,
     limit: itemsPerPage,
     search,
+    status: listStatus,
   });
 
   const itemsOnPage = useMemo(() => itemsData?.data || [], [itemsData]);
@@ -93,6 +100,7 @@ export default function SettingsPage() {
     upc_number: "",
     average_weight_per_unit: null,
     case_quantity: null,
+    is_discontinued: false,
     unit_type: "quantity",
     item_type: null,
     brand: null,
@@ -152,6 +160,7 @@ export default function SettingsPage() {
         upc_number: "",
         average_weight_per_unit: null,
         case_quantity: null,
+        is_discontinued: false,
         unit_type: "quantity",
         item_type: null,
         brand: null,
@@ -204,6 +213,28 @@ export default function SettingsPage() {
       await updateItemMutation.mutateAsync(itemToUpdate);
       setEditingItem(null);
       showMessage("Item updated successfully!", "success");
+    } catch (err: unknown) {
+      showMessage(
+        `Error updating item: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`,
+        "error",
+      );
+    }
+  };
+
+  const handleSetDiscontinued = async (item: Item, discontinued: boolean) => {
+    try {
+      await updateItemMutation.mutateAsync({
+        ...item,
+        is_discontinued: discontinued,
+      });
+      showMessage(
+        discontinued
+          ? `"${item.name}" moved to Discontinued. It can't be added to inventories until restored.`
+          : `"${item.name}" restored to active items.`,
+        "success",
+      );
     } catch (err: unknown) {
       showMessage(
         `Error updating item: ${
@@ -462,9 +493,43 @@ export default function SettingsPage() {
 
       {/* Items list */}
       <Card className="overflow-hidden">
+        <div
+          role="tablist"
+          aria-label="Item lists"
+          className="flex gap-1 border-b border-border px-5 pt-3"
+        >
+          {(
+            [
+              { value: "active", label: "Active" },
+              { value: "discontinued", label: "Discontinued" },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              role="tab"
+              aria-selected={listStatus === tab.value}
+              onClick={() => {
+                setListStatus(tab.value);
+                setCurrentPage(1);
+                setEditingItem(null);
+              }}
+              className={cn(
+                "-mb-px border-b-2 px-3 pb-2.5 text-sm font-medium transition-colors",
+                listStatus === tab.value
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         <CardHeader>
           <div>
-            <CardTitle>All items</CardTitle>
+            <CardTitle>
+              {listStatus === "active" ? "Active items" : "Discontinued items"}
+            </CardTitle>
             {paginationInfo?.totalItems != null && (
               <CardDescription>
                 {paginationInfo.totalItems}{" "}
@@ -511,9 +576,15 @@ export default function SettingsPage() {
             <span className="mb-3 flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <Package className="size-5" />
             </span>
-            <p className="text-sm font-medium text-foreground">No items yet</p>
+            <p className="text-sm font-medium text-foreground">
+              {listStatus === "active"
+                ? "No items yet"
+                : "No discontinued items"}
+            </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Use the form above to add your first item.
+              {listStatus === "active"
+                ? "Use the form above to add your first item."
+                : "Discontinue an item to keep it here without it being added to inventories."}
             </p>
           </div>
         ) : (
@@ -720,19 +791,41 @@ export default function SettingsPage() {
                       <div className="mt-2 flex justify-end gap-1 md:col-span-3 md:mt-0">
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon-sm"
                           onClick={() => setEditingItem(item)}
+                          title="Edit item"
+                          aria-label={`Edit ${item.name}`}
                         >
                           <Pencil />
-                          Edit
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            handleSetDiscontinued(item, !item.is_discontinued)
+                          }
+                          disabled={updateItemMutation.isPending}
+                          title={
+                            item.is_discontinued
+                              ? "Make this item available for inventories again"
+                              : "Keep this item for later without adding it to inventories"
+                          }
+                        >
+                          {item.is_discontinued ? (
+                            <ArchiveRestore />
+                          ) : (
+                            <Archive />
+                          )}
+                          {item.is_discontinued ? "Restore" : "Discontinue"}
                         </Button>
                         <Button
                           variant="ghost-destructive"
-                          size="sm"
+                          size="icon-sm"
                           onClick={() => handleDeleteItem(item.id)}
+                          title="Delete item"
+                          aria-label={`Delete ${item.name}`}
                         >
                           <Trash2 />
-                          Delete
                         </Button>
                       </div>
                     </>

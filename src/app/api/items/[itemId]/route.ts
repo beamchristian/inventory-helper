@@ -20,7 +20,7 @@ function handleError(error: unknown): NextResponse {
     if (error.message.includes("Authentication required")) {
       return NextResponse.json(
         { message: "Authentication required." },
-        { status: 401 }
+        { status: 401 },
       );
     }
   }
@@ -33,21 +33,21 @@ function handleError(error: unknown): NextResponse {
   ) {
     return NextResponse.json(
       { message: "Item not found or you do not have permission." },
-      { status: 404 }
+      { status: 404 },
     );
   }
   // A concurrent request took the same UPC between our check and the write
   if (isUniqueConstraintError(error)) {
     return NextResponse.json(
       { message: "An item with this UPC already exists." },
-      { status: 409 }
+      { status: 409 },
     );
   }
   const errorMessage =
     error instanceof Error ? error.message : "An unknown error occurred.";
   return NextResponse.json(
     { message: "An internal error occurred.", error: errorMessage },
-    { status: 500 }
+    { status: 500 },
   );
 }
 
@@ -56,7 +56,7 @@ export async function GET(
   request: Request,
   context: {
     params: Promise<{ itemId: string }>;
-  }
+  },
 ) {
   try {
     const session = await auth();
@@ -91,7 +91,7 @@ export async function PATCH(
   request: Request,
   context: {
     params: Promise<{ itemId: string }>;
-  }
+  },
 ) {
   try {
     const session = await auth();
@@ -108,7 +108,7 @@ export async function PATCH(
     if (!current) {
       return NextResponse.json(
         { message: "Item not found or you do not have permission." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -123,7 +123,7 @@ export async function PATCH(
       if (!upc) {
         return NextResponse.json(
           { message: UPC_REQUIRED_MESSAGE },
-          { status: 400 }
+          { status: 400 },
         );
       }
       // Reject a UPC that another of the user's items already uses
@@ -131,7 +131,7 @@ export async function PATCH(
       if (existing) {
         return NextResponse.json(
           { message: duplicateItemMessage(existing) },
-          { status: 409 }
+          { status: 409 },
         );
       }
       data.upc_number = upc;
@@ -140,12 +140,21 @@ export async function PATCH(
     if ("average_weight_per_unit" in body) {
       data.average_weight_per_unit = body.average_weight_per_unit;
     }
+    if ("is_discontinued" in body) {
+      if (typeof body.is_discontinued !== "boolean") {
+        return NextResponse.json(
+          { message: "is_discontinued must be true or false." },
+          { status: 400 },
+        );
+      }
+      data.is_discontinued = body.is_discontinued;
+    }
     if ("case_quantity" in body) {
       const caseQuantity = parseCaseQuantity(body.case_quantity);
       if (caseQuantity === undefined) {
         return NextResponse.json(
           { message: CASE_QUANTITY_MESSAGE },
-          { status: 400 }
+          { status: 400 },
         );
       }
       data.case_quantity = caseQuantity;
@@ -155,16 +164,23 @@ export async function PATCH(
     if (data.unit_type === "quantity") data.average_weight_per_unit = null;
 
     // Items counted by weight need a positive average weight per unit
-    const unitType = (data.unit_type as string | undefined) ?? current.unit_type;
+    const unitType =
+      (data.unit_type as string | undefined) ?? current.unit_type;
     if (unitType === "weight") {
       const weight =
         "average_weight_per_unit" in data
           ? data.average_weight_per_unit
           : current.average_weight_per_unit;
-      if (typeof weight !== "number" || !Number.isFinite(weight) || weight <= 0) {
+      if (
+        typeof weight !== "number" ||
+        !Number.isFinite(weight) ||
+        weight <= 0
+      ) {
         return NextResponse.json(
-          { message: "Average weight per unit must be a number greater than 0." },
-          { status: 400 }
+          {
+            message: "Average weight per unit must be a number greater than 0.",
+          },
+          { status: 400 },
         );
       }
     }
@@ -185,7 +201,7 @@ export async function DELETE(
   request: Request,
   context: {
     params: Promise<{ itemId: string }>;
-  }
+  },
 ) {
   try {
     const session = await auth();
@@ -206,7 +222,7 @@ export async function DELETE(
 
     return NextResponse.json(
       { message: "Item deleted successfully." },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error) {
     return handleError(error);

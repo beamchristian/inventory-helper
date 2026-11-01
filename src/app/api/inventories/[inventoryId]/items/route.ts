@@ -12,7 +12,7 @@ export async function GET(
   req: Request,
   context: {
     params: Promise<{ inventoryId: string }>;
-  }
+  },
 ): Promise<NextResponse> {
   try {
     const session = await auth(); // Get the server-side session
@@ -26,7 +26,7 @@ export async function GET(
     if (!inventoryId) {
       return NextResponse.json(
         { message: "Inventory ID is required." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -41,7 +41,7 @@ export async function GET(
     if (!inventory) {
       return NextResponse.json(
         { message: "Inventory not found or unauthorized." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -66,12 +66,12 @@ export async function GET(
     if (errorMessage.includes("Authentication required.")) {
       return NextResponse.json(
         { message: "Authentication required." },
-        { status: 401 }
+        { status: 401 },
       );
     }
     return NextResponse.json(
       { message: "Failed to fetch inventory items.", error: errorMessage },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -80,7 +80,7 @@ export async function POST(
   req: Request,
   context: {
     params: Promise<{ inventoryId: string }>;
-  }
+  },
 ): Promise<NextResponse> {
   try {
     const session = await auth(); // Get the server-side session
@@ -95,7 +95,7 @@ export async function POST(
     if (!inventoryId || !item_id) {
       return NextResponse.json(
         { message: "Inventory ID and Item ID are required." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -110,7 +110,28 @@ export async function POST(
     if (!inventory) {
       return NextResponse.json(
         { message: "Inventory not found or unauthorized." },
-        { status: 404 }
+        { status: 404 },
+      );
+    }
+
+    // The item must be one of the user's own, and not discontinued
+    const item = await db.item.findFirst({
+      where: { id: item_id, user_id: session.user.id },
+      select: { is_discontinued: true },
+    });
+    if (!item) {
+      return NextResponse.json(
+        { message: "Item not found or unauthorized." },
+        { status: 404 },
+      );
+    }
+    if (item.is_discontinued) {
+      return NextResponse.json(
+        {
+          message:
+            "This item is discontinued. Restore it on the Items page to add it to an inventory.",
+        },
+        { status: 409 },
       );
     }
 
@@ -125,7 +146,7 @@ export async function POST(
     if (existingInventoryItem) {
       return NextResponse.json(
         { message: "Item already exists in this inventory." },
-        { status: 409 } // 409 Conflict
+        { status: 409 }, // 409 Conflict
       );
     }
 
@@ -147,7 +168,7 @@ export async function POST(
     if (isUniqueConstraintError(error)) {
       return NextResponse.json(
         { message: "Item already exists in this inventory." },
-        { status: 409 }
+        { status: 409 },
       );
     }
     console.error("Error adding item to inventory:", error);
@@ -158,7 +179,7 @@ export async function POST(
         message: "Failed to add item to inventory",
         error: errorMessage,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -170,7 +191,7 @@ export async function DELETE(
   req: Request,
   context: {
     params: Promise<{ inventoryId: string }>;
-  }
+  },
 ): Promise<NextResponse> {
   try {
     const session = await auth();
@@ -187,7 +208,7 @@ export async function DELETE(
           message:
             "Inventory ID and Inventory Item ID are required for deletion.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -209,7 +230,7 @@ export async function DELETE(
     if (!inventoryItemToDelete) {
       return NextResponse.json(
         { message: "Inventory item not found." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -217,7 +238,7 @@ export async function DELETE(
     if (inventoryItemToDelete.inventory.userId !== session.user.id) {
       return NextResponse.json(
         { message: "Unauthorized action." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -229,7 +250,7 @@ export async function DELETE(
 
     return NextResponse.json(
       { message: "Item successfully removed from inventory." },
-      { status: 200 }
+      { status: 200 },
     );
   } catch (error: unknown) {
     console.error("Error deleting inventory item:", error);
@@ -240,7 +261,7 @@ export async function DELETE(
         message: "Failed to remove item from inventory",
         error: errorMessage,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -20,7 +20,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { cn, handleCopyValue, showMessage } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/input";
-import { StatusBadge } from "@/components/ui/badge";
+import { Badge, StatusBadge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -774,6 +774,11 @@ export default function InventoryDetailPage() {
                         >
                           {invItem.item?.name || "N/A"}
                         </button>
+                        {invItem.item?.is_discontinued && (
+                          <Badge className="ml-2 align-middle">
+                            Discontinued
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs text-muted-foreground">
                         {invItem.item?.upc_number || "—"}
@@ -867,6 +872,11 @@ export default function InventoryDetailPage() {
                     >
                       <p className="truncate font-medium text-foreground">
                         {invItem.item?.name || "N/A"}
+                        {invItem.item?.is_discontinued && (
+                          <Badge className="ml-2 align-middle">
+                            Discontinued
+                          </Badge>
+                        )}
                       </p>
                       <p className="mt-0.5 truncate text-xs capitalize text-muted-foreground">
                         {[invItem.item?.item_type, invItem.item?.brand]

@@ -24,6 +24,7 @@ interface UseItemsProps {
   page?: number;
   limit?: number;
   search?: string; // matches name, UPC, brand or type
+  status?: "active" | "discontinued";
 }
 
 // --- HELPER FUNCTION ---
@@ -47,11 +48,12 @@ export const useItems = ({
   page = 1,
   limit = 10,
   search = "",
+  status: listStatus = "active",
 }: UseItemsProps = {}) => {
   const { status } = useSession();
   const query = search.trim();
   return useQuery<PaginatedItemsResponse>({
-    queryKey: ["items", { page, limit, search: query }],
+    queryKey: ["items", { page, limit, search: query, status: listStatus }],
     queryFn: async () => {
       if (status !== "authenticated")
         throw new Error("Authentication required.");
@@ -60,6 +62,7 @@ export const useItems = ({
         limit: String(limit),
       });
       if (query) params.set("q", query);
+      if (listStatus === "discontinued") params.set("status", "discontinued");
       const response = await fetch(`/api/items?${params}`);
       return handleApiResponse(response);
     },

@@ -46,7 +46,7 @@ export async function findDuplicateItem(
       upc_number: upc,
       ...(excludeId && { id: { not: excludeId } }),
     },
-    select: { id: true, name: true, upc_number: true },
+    select: { id: true, name: true, upc_number: true, is_discontinued: true },
   });
 }
 
@@ -54,8 +54,10 @@ export async function findDuplicateItem(
 export function duplicateItemMessage(existing: {
   name: string;
   upc_number: string;
+  is_discontinued: boolean;
 }) {
-  return `An item with UPC ${existing.upc_number} already exists ("${existing.name}").`;
+  const where = existing.is_discontinued ? " on the Discontinued tab" : "";
+  return `An item with UPC ${existing.upc_number} already exists${where} ("${existing.name}").`;
 }
 
 /** True when Prisma rejected a write because of a unique constraint. */
