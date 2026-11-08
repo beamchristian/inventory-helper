@@ -54,10 +54,27 @@ export function buildInventoryExport(
   return lines.join(LINE_BREAK) + LINE_BREAK;
 }
 
+/** Makes a name safe for a file name, e.g. "Weekly 10/30/26" -> "Weekly 10_30_26". */
+export function safeFileBaseName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]+/g, "_").trim() || "inventory";
+}
+
 /** File name for the download, e.g. "Weekly 10/30/26" -> "Weekly 10_30_26.txt". */
 export function exportFileName(inventoryName: string): string {
-  const safe = inventoryName.replace(/[\\/:*?"<>|]+/g, "_").trim();
-  return `${safe || "inventory"}.txt`;
+  return `${safeFileBaseName(inventoryName)}.txt`;
+}
+
+/** Saves a generated file through the browser's normal download. */
+export function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Give the browser a moment to start the download before freeing the file
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /** Triggers a browser download of the inventory file. */
@@ -68,12 +85,5 @@ export function downloadInventoryExport(
   const blob = new Blob([buildInventoryExport(inventoryName, items)], {
     type: "text/plain;charset=us-ascii",
   });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = exportFileName(inventoryName);
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, exportFileName(inventoryName));
 }

@@ -32,6 +32,7 @@ import { PageContainer, PageHeader } from "@/components/ui/page-header";
 import { SearchInput } from "@/components/ui/search-input";
 import { downloadInventoryExport } from "@/lib/export";
 import { useDialog } from "@/components/DialogProvider";
+import { CountSheetDialog } from "@/components/CountSheetDialog";
 import {
   ArrowDown,
   ArrowLeft,
@@ -40,6 +41,7 @@ import {
   ChevronDown,
   Copy,
   Download,
+  Printer,
   Pencil,
   Plus,
   RotateCcw,
@@ -99,6 +101,7 @@ export default function InventoryDetailPage() {
   // null = automatic: closed, but opened while a search matches entered items
   const [showEntered, setShowEntered] = useState<boolean | null>(null);
   const [searchInput, setSearchInput] = useState("");
+  const [isCountSheetOpen, setIsCountSheetOpen] = useState(false);
 
   const {
     data: inventory,
@@ -579,6 +582,15 @@ export default function InventoryDetailPage() {
               <Download />
               Export .txt
             </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsCountSheetOpen(true)}
+              disabled={sortedItems.length === 0}
+              title="Print a paper count sheet as PDF or Word"
+            >
+              <Printer />
+              Count sheet
+            </Button>
             {inventory.status !== "completed" ? (
               <Button
                 variant="success"
@@ -1029,6 +1041,14 @@ export default function InventoryDetailPage() {
           </div>
         )}
       </Card>
+
+      <CountSheetDialog
+        isOpen={isCountSheetOpen}
+        onClose={() => setIsCountSheetOpen(false)}
+        inventoryName={inventory.name}
+        allItems={sortedItems}
+        itemsToEnter={unenteredItems}
+      />
     </PageContainer>
   );
 }
